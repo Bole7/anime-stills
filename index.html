@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>截帧 · 近期日漫截图分享</title>
+<meta name="description" content="截帧 —— 一个近期日本动画截图分享站。环幕旋转查看精选画面，可按色调筛选全部 53 帧，点击放大阅读字幕细节。">
+<meta name="author" content="王博乐">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/components.css">
+</head>
+<body>
+
+<a class="skip-link" href="#index">跳到截图目录</a>
+
+<!-- ============================ 站点导航 ============================ -->
+<header class="site-header intro intro-1" id="siteHeader">
+  <div class="shell">
+    <a class="brand" href="#top">
+      <span class="brand__dot" aria-hidden="true"></span>
+      截帧
+      <span class="brand__latin">Anime Stills</span>
+    </a>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="#stage">环幕</a>
+      <a href="#index">目录</a>
+      <a href="#about">关于</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ========================== 一、环幕轮播 ========================== -->
+  <section class="stage" id="stage" aria-labelledby="siteTitle">
+    <div class="shell">
+
+      <!-- 站名：竖排压住环幕左侧，刻意破格 -->
+      <div class="stage__mark intro intro-2">
+        <h1 id="siteTitle">截帧</h1>
+        <p class="stage__mark-latin">Anime Stills · Rotary Archive</p>
+      </div>
+
+      <!-- 3D 圆柱环幕：面板由 JS 依数据注入 -->
+      <div class="carousel intro intro-3 intro-fade" id="carousel"
+           role="region" aria-roledescription="轮播"
+           aria-label="近期动画截图环幕，可用方向键切换">
+        <div class="carousel__ring" id="ring"></div>
+      </div>
+
+      <!-- 控制台 -->
+      <div class="stage__hud intro intro-4">
+        <div class="hud__now">
+          <span class="hud__index" id="hudIndex">—</span>
+          <span class="hud__title" id="hudTitle">载入中</span>
+          <span class="hud__latin" id="hudLatin"></span>
+          <span class="hud__tags" id="hudTags"></span>
+        </div>
+
+        <div class="hud__controls">
+          <span class="hud__hint">拖拽 / ← →</span>
+
+          <div class="hud__ticks" id="hudTicks" role="tablist" aria-label="帧速览"></div>
+
+          <button class="ctrl" id="btnPrev" type="button" aria-label="上一帧">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M15 5l-7 7 7 7"/>
+            </svg>
+          </button>
+          <button class="ctrl" id="btnNext" type="button" aria-label="下一帧">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 5l7 7-7 7"/>
+            </svg>
+          </button>
+          <button class="ctrl" id="btnAuto" type="button" aria-pressed="true" aria-label="暂停自动旋转">
+            <svg class="icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+              <path d="M9 5v14M15 5v14"/>
+            </svg>
+            <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M7 4.5l12 7.5-12 7.5z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =========================== 二、目录 =========================== -->
+  <section class="index" id="index" aria-labelledby="indexTitle">
+    <div class="shell">
+      <div class="section-head reveal">
+        <div>
+          <p class="eyebrow">Index · 目录</p>
+          <h2 id="indexTitle">全部 <span class="num" id="totalCount">53</span> 帧</h2>
+        </div>
+        <p>每帧都经过主色分析自动归档，可按色调快速翻找。画面保留原尺寸字幕细节，仅移除来源水印。</p>
+      </div>
+
+      <div class="filters" id="filters" role="group" aria-label="按色调筛选"></div>
+      <div class="grid" id="grid"></div>
+      <p class="empty" id="empty" hidden>这个色调下暂时没有画面。</p>
+    </div>
+  </section>
+
+  <!-- =========================== 三、关于 =========================== -->
+  <section class="about" id="about" aria-labelledby="aboutTitle">
+    <div class="shell">
+      <p class="eyebrow reveal">About · 关于本站</p>
+
+      <div class="about__body">
+        <p class="about__lede reveal" id="aboutTitle">
+          把喜欢的画面<em>停下来</em>。<br>
+          一帧一帧地看，比连着看完一遍，更容易记很久。
+        </p>
+
+        <div class="about__cols reveal">
+          <p>这里收的是近期在追的动画里按下的截图，以《电锯人》为主，混着几部同期作品。挑片子的标准只有一条：这一帧单独拿出来，还立得住。</p>
+          <p>页面主体是一圈会缓慢自转的环幕 —— 可以拖，可以滚，也可以用方向键一帧一帧翻。看到想细看的，点开就是原图。</p>
+
+          <dl class="stats">
+            <div>
+              <dt>Frames</dt>
+              <dd id="statCount">53</dd>
+            </div>
+            <div>
+              <dt>Rotary</dt>
+              <dd id="statHero">08</dd>
+            </div>
+            <div>
+              <dt>Batches</dt>
+              <dd>02</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============================= 页脚 ============================= -->
+<footer class="site-footer">
+  <div class="shell">
+    <span>截帧 · ANIME STILLS — 个人截图收藏，仅作学习与作业展示</span>
+    <span>HTML / CSS / JavaScript · <span id="year">2026</span></span>
+  </div>
+</footer>
+
+<!-- ============================= 灯箱 ============================= -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lbTitle">
+  <button class="lightbox__close" id="lbClose" type="button" aria-label="关闭查看">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18"/>
+    </svg>
+  </button>
+  <button class="lightbox__nav lightbox__nav--prev" id="lbPrev" type="button" aria-label="上一张">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M15 5l-7 7 7 7"/>
+    </svg>
+  </button>
+  <button class="lightbox__nav lightbox__nav--next" id="lbNext" type="button" aria-label="下一张">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M9 5l7 7-7 7"/>
+    </svg>
+  </button>
+
+  <div class="lightbox__inner">
+    <img class="lightbox__img" id="lbImg" src="" alt="">
+    <div class="lightbox__bar">
+      <span><strong id="lbTitle">—</strong> <span id="lbLatin"></span></span>
+      <span id="lbMeta"></span>
+    </div>
+  </div>
+</div>
+
+<script src="scripts/frames-data.js"></script>
+<script src="scripts/main.js"></script>
+</body>
+</html>
