@@ -133,6 +133,7 @@
   var hiddenSet = readLS(LS_HIDDEN, {});
   if (!Array.isArray(seriesList)) { seriesList = []; }
   seriesList = seriesList.filter(function (s) { return s && s.id && s.name; });
+  seedSeriesFromData();          // 把素材清单里声明的分类补进分类表
 
   function isHidden(f) { return !!hiddenSet[String(f.id)]; }
   /* 目录里真正露面的那些：内置素材减去被隐藏的 */
@@ -156,7 +157,30 @@
 
   function seriesOf(f) {
     var id = assignMap[String(f.id)];
-    return (id && liveSeries(id)) ? id : UNSORTED;
+    if (id && liveSeries(id)) { return id; }
+    // 没有本地覆盖时，退回素材清单里声明的归属（随文件发布，人人可见）
+    if (f.series) {
+      for (var i = 0; i < seriesList.length; i++) {
+        if (seriesList[i].name === f.series) { return seriesList[i].id; }
+      }
+    }
+    return UNSORTED;
+  }
+
+  /* 素材清单里写明的分类，本地没有同名分类就自动建一条。
+     这样换台机器、换个浏览器打开，分类也是齐的 —— 不再依赖某人的本地数据。 */
+  function seedSeriesFromData() {
+    var byName = {};
+    seriesList.forEach(function (s) { byName[s.name] = s.id; });
+    var added = 0;
+    FRAMES.forEach(function (f) {
+      if (!f.series || byName[f.series]) { return; }
+      var id = 'base-' + f.series;
+      seriesList.push({ id: id, name: f.series, fromData: true });
+      byName[f.series] = id;
+      added++;
+    });
+    return added;
   }
   function seriesName(id) {
     if (id === ALL) { return '全部'; }
