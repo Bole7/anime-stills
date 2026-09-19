@@ -1,0 +1,14 @@
+# 编辑器与系统文件
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 工作区临时文件：构建脚本、调试截图、记忆文件
+# （素材生成脚本在这里，不属于网站源码）
+.workbuddy/
+
+# 本项目零依赖，占位防止误提交
+node_modules/
