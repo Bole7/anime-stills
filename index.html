@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>截帧 · 近期日漫截图分享</title>
-<meta name="description" content="截帧 —— 一个近期日本动画截图分享站。环幕旋转查看精选画面，可按色调筛选，点击放大阅读字幕细节。">
+<title>近期日漫截图分享</title>
+<meta name="description" content="近期日本动画截图分享站。环幕旋转查看精选画面，可按色调筛选，点击放大阅读字幕细节。">
 <meta name="author" content="王博乐">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,11 +22,6 @@
 <!-- ============================ 站点导航 ============================ -->
 <header class="site-header intro intro-1" id="siteHeader">
   <div class="shell">
-    <a class="brand" href="#top">
-      <span class="brand__dot" aria-hidden="true"></span>
-      截帧
-      <span class="brand__latin">Anime Stills</span>
-    </a>
     <nav class="site-nav" aria-label="主导航">
       <a href="#stage">环幕</a>
       <a href="#index">目录</a>
@@ -39,16 +34,13 @@
 
   <!-- ========================== 一、环幕轮播 ========================== -->
   <section class="stage" id="stage" aria-labelledby="siteTitle">
+    <!-- 页面的标题只留给屏幕阅读器，画面上不落字 -->
+    <h1 class="sr-only" id="siteTitle">近期日漫截图分享</h1>
+
     <div class="shell">
 
-      <!-- 站名：竖排压住环幕左侧，刻意破格 -->
-      <div class="stage__mark intro intro-2">
-        <h1 id="siteTitle">截帧</h1>
-        <p class="stage__mark-latin">Anime Stills · Rotary Archive</p>
-      </div>
-
       <!-- 3D 圆柱环幕：面板由 JS 依数据注入 -->
-      <div class="carousel intro intro-3 intro-fade" id="carousel"
+      <div class="carousel intro intro-2 intro-fade" id="carousel"
            role="region" aria-roledescription="轮播"
            aria-label="近期动画截图环幕，可用方向键切换">
         <div class="carousel__ring" id="ring"></div>
@@ -105,7 +97,7 @@
 <!-- ============================= 页脚 ============================= -->
 <footer class="site-footer">
   <div class="shell">
-    <span>截帧 · ANIME STILLS — 个人截图收藏，仅作学习与作业展示</span>
+    <span>个人截图收藏，仅作学习与作业展示</span>
     <span>HTML / CSS / JavaScript · <span id="year">2026</span></span>
   </div>
 </footer>
