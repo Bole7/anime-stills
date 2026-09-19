@@ -1,7 +1,7 @@
 /* 素材清单：由 build-assets 流程自动生成，含每张的色调分析结果 */
 window.ANIME_FRAMES = {
  "ratio": 1.8155,
- "count": 120,
+ "count": 119,
  /* 有 1600px 大图的那些：环幕优先取 hero，没有的退回 view（1200px），
     免得用户把任意一张放上环幕时去请求并不存在的 assets/hero/xx.webp */
  "heroAssets": [
@@ -30,7 +30,6 @@ window.ANIME_FRAMES = {
   "wz-16",
   "wz-17",
   "wz-18",
-  "wz-19",
   "wz-21",
   "wz-24",
   "wz-25",
@@ -1225,20 +1224,6 @@ window.ANIME_FRAMES = {
     "冷调"
    ],
    "v": 0.355,
-   "date": "2026.09.19"
-  },
-  {
-   "id": 83,
-   "name": "wz-19",
-   "series": "wz",
-   "hero": false,
-   "title": "",
-   "en": "",
-   "series": "wz",
-   "tags": [
-    "冷调"
-   ],
-   "v": 0.422,
    "date": "2026.09.19"
   },
   {
