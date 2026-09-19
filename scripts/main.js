@@ -1,9 +1,10 @@
 /* ==========================================================================
    main.js — 交互层
    1. 环幕轮播（3D 圆柱：自动旋转 / 拖拽惯性 / 吸附 / 键盘 / 触点）
-   2. 目录网格（渲染 + 色调筛选）
+   2. 目录网格（渲染 + 色调筛选 + 自传图片的增量插入与移除）
    3. 灯箱（放大查看 + 键盘导航 + 焦点回收）
-   4. 入场编排与导航状态
+   4. 上传（本机图片 → canvas 缩放编码 → 色调分析 → IndexedDB 落盘）
+   5. 入场编排与导航状态
    说明：全部逻辑用普通脚本封装在 IIFE 内，双击本地文件即可运行，
         不依赖任何构建工具与模块加载（避免 file:// 下的跨域限制）。
    ========================================================================== */
@@ -13,7 +14,7 @@
   var DATA = window.ANIME_FRAMES;
   if (!DATA || !DATA.frames) return;
 
-  var FRAMES = DATA.frames;
+  var FRAMES = DATA.frames;        // 内置素材，自传的图片会插到最前面
   var HERO = FRAMES.filter(function (f) { return f.hero; });
   var TAGS = ['全部', '夜色', '明亮', '暖调', '冷调', '低饱和'];
 
@@ -22,6 +23,12 @@
   var $ = function (sel) { return document.querySelector(sel); };
   var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
   var mod = function (n, m) { return ((n % m) + m) % m; };
+
+  /* 内置素材有三档尺寸，自传的图只有一张 blob 地址 */
+  function imgURL(f, size) {
+    return f.custom ? f.src : 'assets/' + size + '/' + f.name + '.webp';
+  }
+  function kindOf(f) { return f.custom ? '自传图片' : '动画截图'; }
 
   /* ======================================================================
      一、环幕轮播
@@ -211,51 +218,80 @@
   var filters = $('#filters');
   var empty = $('#empty');
   var currentTag = '全部';
+  var revealIO = null;
+  var addBtn = null;
+
+  function buildCard(f, i) {
+    var card = document.createElement('figure');
+    card.className = 'card reveal';
+    card.dataset.id = String(f.id);
+    card.dataset.tags = f.tags.join(',');
+    // 同屏卡片错峰淡入，间隔 60ms 一档
+    card.style.transitionDelay = (i % 4) * 60 + 'ms';
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'card__frame';
+    btn.setAttribute('aria-label', '放大查看' + (f.title ? '：' + f.title : '这张图片'));
+
+    var img = document.createElement('img');
+    img.className = 'card__img';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.src = imgURL(f, 'grid');
+    img.alt = (f.title ? f.title + '：' : '') + kindOf(f) + '，色调' + f.tags.join('、');
+
+    btn.appendChild(img);
+
+    // 有题名的才在悬停时浮现题名条，没有的就保持干净
+    if (f.title) {
+      var hover = document.createElement('span');
+      hover.className = 'card__hover';
+      hover.textContent = f.title;
+      btn.appendChild(hover);
+    }
+
+    btn.addEventListener('click', function () { openLightbox(f); });
+    card.appendChild(btn);
+
+    // 自己传的才给移除按钮
+    if (f.custom) {
+      var rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'card__remove';
+      rm.title = '移除';
+      rm.setAttribute('aria-label', '移除这张图片');
+      rm.innerHTML =
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
+        'stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      rm.addEventListener('click', function (e) {
+        e.stopPropagation();
+        removeCustom(f);
+      });
+      card.appendChild(rm);
+    }
+
+    return card;
+  }
 
   function renderGrid() {
     var frag = document.createDocumentFragment();
-
-    FRAMES.forEach(function (f, i) {
-      var card = document.createElement('figure');
-      card.className = 'card reveal';
-      card.dataset.id = String(f.id);
-      card.dataset.tags = f.tags.join(',');
-      // 同屏卡片错峰淡入，间隔 60ms 一档
-      card.style.transitionDelay = (i % 4) * 60 + 'ms';
-
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'card__frame';
-      btn.setAttribute('aria-label', '放大查看' + (f.title ? '：' + f.title : '这张截图'));
-
-      var img = document.createElement('img');
-      img.className = 'card__img';
-      img.loading = 'lazy';
-      img.decoding = 'async';
-      img.src = 'assets/grid/' + f.name + '.webp';
-      img.alt = (f.title ? f.title + '：' : '') + '动画截图，色调' + f.tags.join('、');
-
-      btn.appendChild(img);
-
-      // 有题名的才在悬停时浮现题名条，没有的就保持干净
-      if (f.title) {
-        var hover = document.createElement('span');
-        hover.className = 'card__hover';
-        hover.textContent = f.title;
-        btn.appendChild(hover);
-      }
-
-      btn.addEventListener('click', function () { openLightbox(f); });
-
-      card.appendChild(btn);
-      frag.appendChild(card);
-    });
-
+    FRAMES.forEach(function (f, i) { frag.appendChild(buildCard(f, i)); });
     grid.innerHTML = '';
     grid.appendChild(frag);
   }
 
+  /* 新图片插到最前面，跟数据数组的顺序保持一致 */
+  function prependCard(f) {
+    var card = buildCard(f, 0);
+    grid.insertBefore(card, grid.firstChild);
+    if (revealIO) { revealIO.observe(card); }
+    else { card.classList.add('is-in'); }
+  }
+
   function buildFilters() {
+    filters.innerHTML = '';
+
     TAGS.forEach(function (tag, i) {
       var count = tag === '全部'
         ? FRAMES.length
@@ -270,11 +306,25 @@
       chip.addEventListener('click', function () { applyFilter(tag); });
       filters.appendChild(chip);
     });
+
+    // 上传入口：跟在一排筛选后面，只用一个加号，不占文字
+    addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.id = 'addBtn';
+    addBtn.className = 'chip chip--add';
+    addBtn.title = '上传本地图片';
+    addBtn.setAttribute('aria-label', '上传本地图片');
+    addBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+    addBtn.addEventListener('click', function () { fileInput.click(); });
+    filters.appendChild(addBtn);
   }
 
   function applyFilter(tag) {
     currentTag = tag;
     Array.prototype.forEach.call(filters.children, function (chip) {
+      if (!chip.dataset.tag) return;      // 上传按钮不参与筛选状态
       chip.setAttribute('aria-pressed', chip.dataset.tag === tag ? 'true' : 'false');
     });
 
@@ -297,6 +347,11 @@
     });
   }
 
+  function paintStats() {
+    $('#statCount').textContent = pad(FRAMES.length);
+    $('#statHero').textContent = pad(HERO.length);
+  }
+
   /* ======================================================================
      三、灯箱
      ====================================================================== */
@@ -312,11 +367,12 @@
   function paintLightbox() {
     var f = lbList[lbPos];
     if (!f) return;
-    lbImg.src = 'assets/view/' + f.name + '.webp';
-    lbImg.alt = (f.title ? f.title + '：' : '') + '动画截图';
+    lbImg.src = imgURL(f, 'view');
+    lbImg.alt = (f.title ? f.title + '：' : '') + kindOf(f);
     lbTitle.textContent = f.title || '—';
     lbLatin.textContent = f.title ? (f.en || '') : '';
-    lbMeta.textContent = pad(f.id) + ' / ' + pad(lbList.length) + ' · ' + f.date + ' · ' + f.tags.join(' · ');
+    lbMeta.textContent = pad(lbPos + 1) + ' / ' + pad(lbList.length) +
+                         (f.date ? ' · ' + f.date : '') + ' · ' + f.tags.join(' · ');
   }
 
   function openLightbox(frame) {
@@ -366,7 +422,317 @@
   });
 
   /* ======================================================================
-     四、入场编排与导航状态
+     四、上传本机图片
+     流程：读文件 → canvas 缩放并编码为 WebP → 统计色调打标签 → 写库 → 插入网格
+     色调统计刻意复刻构建内置素材时用的那套阈值，两边的标签才可比。
+     ====================================================================== */
+  var fileInput = $('#fileInput');
+  var dropzone = $('#dropzone');
+  var toastEl = $('#toast');
+
+  var MAX_EDGE = 1440;             // 处理后长边上限
+  var MAX_CUSTOM = 60;             // 最多留存张数，避免拖垮浏览器
+  var CUSTOM_TITLE = '';           // 自传图片暂无题名
+
+  /* --- 小提示条 --- */
+  var toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('is-on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('is-on'); }, 2600);
+  }
+
+  /* --- 色调统计：与构建脚本同一套算法与阈值 ---
+     rgb → hsv；v 取明度均值，s 取饱和度均值；
+     色相 <90° 或 >300° 记暖，150°~300° 记冷（饱和度 >0.10 的像素才计入） */
+  function rgb2hsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    var h = 0;
+    if (d !== 0) {
+      if (max === r) { h = ((g - b) / d) % 6; }
+      else if (max === g) { h = (b - r) / d + 2; }
+      else { h = (r - g) / d + 4; }
+      h *= 60;
+      if (h < 0) { h += 360; }
+    }
+    return [h, max === 0 ? 0 : d / max, max];
+  }
+
+  function shadeOf(canvas) {
+    var W = 160, H = 90;                       // 与构建脚本的采样尺寸一致
+    var sample = document.createElement('canvas');
+    sample.width = W;
+    sample.height = H;
+    var ctx = sample.getContext('2d');
+    ctx.drawImage(canvas, 0, 0, W, H);
+
+    var px = ctx.getImageData(0, 0, W, H).data;
+    var n = W * H, val = 0, sat = 0, warm = 0, cool = 0;
+
+    for (var i = 0; i < px.length; i += 4) {
+      var hsv = rgb2hsv(px[i], px[i + 1], px[i + 2]);
+      val += hsv[2];
+      sat += hsv[1];
+      if (hsv[1] > 0.10) {
+        if (hsv[0] < 90 || hsv[0] > 300) { warm++; }
+        else if (hsv[0] > 150 && hsv[0] < 300) { cool++; }
+      }
+    }
+    return { v: val / n, s: sat / n, warm: warm / n, cool: cool / n };
+  }
+
+  function tagsOf(st) {
+    var tags = [];
+    if (st.v < 0.34) { tags.push('夜色'); }
+    else if (st.v > 0.55) { tags.push('明亮'); }
+    if (st.warm > 0.34) { tags.push('暖调'); }
+    if (st.cool > 0.34) { tags.push('冷调'); }
+    if (st.s < 0.18) { tags.push('低饱和'); }
+    if (!tags.length) { tags.push('中间调'); }
+    return tags;
+  }
+
+  /* --- 落盘：优先 IndexedDB，不可用时退化成"只在本次会话有效" --- */
+  var DB_NAME = 'anime-stills';
+  var DB_STORE = 'uploads';
+  var dbFailed = false;
+  var memFallback = {};
+  var dbPromise = null;
+
+  function openDB() {
+    if (dbPromise) { return dbPromise; }
+    dbPromise = new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error('unsupported')); return; }
+      var req;
+      try { req = indexedDB.open(DB_NAME, 1); }
+      catch (err) { reject(err); return; }
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) {
+          db.createObjectStore(DB_STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error('open failed')); };
+      req.onblocked = function () { reject(new Error('blocked')); };
+    });
+    return dbPromise;
+  }
+
+  function store(mode, job) {
+    return openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var t = db.transaction(DB_STORE, mode);
+        var req = job(t.objectStore(DB_STORE));
+        t.oncomplete = function () { resolve(req ? req.result : undefined); };
+        t.onerror = function () { reject(t.error || new Error('tx failed')); };
+        t.onabort = function () { reject(t.error || new Error('tx aborted')); };
+      });
+    });
+  }
+
+  function saveRecord(rec) {
+    memFallback[rec.id] = rec;
+    return store('readwrite', function (s) { return s.put(rec); }).catch(function () {
+      if (!dbFailed) { dbFailed = true; }
+    });
+  }
+
+  function dropRecord(id) {
+    delete memFallback[id];
+    return store('readwrite', function (s) { return s.delete(id); }).catch(function () {});
+  }
+
+  function loadRecords() {
+    return store('readonly', function (s) { return s.getAll(); })
+      .catch(function () { dbFailed = true; return []; })
+      .then(function (recs) {
+        if (recs && recs.length) { return recs; }
+        // 库不可用（例如某些浏览器在 file:// 下的限制）时，退回内存里的副本
+        return Object.keys(memFallback).map(function (k) { return memFallback[k]; });
+      });
+  }
+
+  /* --- 单张处理 --- */
+  function prepare(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+
+      img.onload = function () {
+        var nw = img.naturalWidth || img.width;
+        var nh = img.naturalHeight || img.height;
+        var scale = Math.min(1, MAX_EDGE / Math.max(nw, nh));
+        var w = Math.max(1, Math.round(nw * scale));
+        var h = Math.max(1, Math.round(nh * scale));
+
+        var canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+
+        var st = shadeOf(canvas);
+        canvas.toBlob(function (blob) {
+          if (!blob) { reject(new Error('encode failed')); return; }
+          resolve({
+            blob: blob,
+            tags: tagsOf(st),
+            v: Math.round(st.v * 1000) / 1000,
+            w: w,
+            h: h
+          });
+        }, 'image/webp', 0.82);
+      };
+
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+      img.src = url;
+    });
+  }
+
+  function stamp() {
+    var d = new Date();
+    return d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate());
+  }
+
+  function countCustom() {
+    return FRAMES.filter(function (f) { return f.custom; }).length;
+  }
+
+  function mountCustom(rec) {
+    var f = {
+      id: rec.id,
+      name: rec.id,
+      custom: true,
+      hero: false,
+      title: CUSTOM_TITLE,
+      en: '',
+      tags: rec.tags || [],
+      v: rec.v || 0,
+      date: rec.date || '',
+      src: URL.createObjectURL(rec.blob)
+    };
+    FRAMES.unshift(f);
+    prependCard(f);
+    return f;
+  }
+
+  function addOne(file) {
+    return prepare(file).then(function (rec) {
+      rec.id = 'c' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+      rec.date = stamp();
+      rec.ts = Date.now();
+      mountCustom(rec);
+      return saveRecord(rec).then(function () { return true; });
+    });
+  }
+
+  /* --- 批量入口：文件选择与拖拽共用 --- */
+  function handleFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []).filter(function (f) {
+      return /^image\//.test(f.type);
+    });
+    if (!files.length) { toast('这里只认图片文件'); return; }
+
+    var room = MAX_CUSTOM - countCustom();
+    if (room <= 0) { toast('最多留 ' + MAX_CUSTOM + ' 张，先移掉几张'); return; }
+    var skipped = files.length - Math.min(files.length, room);
+    files = files.slice(0, room);
+
+    if (addBtn) { addBtn.classList.add('is-busy'); }
+
+    var ok = 0, bad = 0;
+    var chain = Promise.resolve();
+    files.forEach(function (file) {
+      chain = chain.then(function () {
+        return addOne(file).then(
+          function () { ok++; },
+          function () { bad++; }
+        );
+      });
+    });
+
+    chain.then(function () {
+      if (addBtn) { addBtn.classList.remove('is-busy'); }
+      buildFilters();
+      applyFilter(currentTag);
+      paintStats();
+
+      var msg = ok ? '已加入 ' + ok + ' 张' : '没能读进来';
+      if (bad) { msg += '，' + bad + ' 张跳过'; }
+      if (skipped) { msg += '，另有 ' + skipped + ' 张超出上限'; }
+      if (dbFailed) { msg += '（本次有效）'; }
+      toast(msg);
+    });
+  }
+
+  function removeCustom(f) {
+    var i = FRAMES.indexOf(f);
+    if (i >= 0) { FRAMES.splice(i, 1); }
+
+    var card = grid.querySelector('.card[data-id="' + f.id + '"]');
+    if (card && card.parentNode) { card.parentNode.removeChild(card); }
+
+    if (f.src) { URL.revokeObjectURL(f.src); }
+    dropRecord(f.id);
+
+    buildFilters();
+    applyFilter(currentTag);
+    paintStats();
+    toast('已移除');
+  }
+
+  /* --- 入口一：筛选条上的加号 --- */
+  fileInput.addEventListener('change', function () {
+    handleFiles(fileInput.files);
+    fileInput.value = '';          // 允许重复选同一个文件
+  });
+
+  /* --- 入口二：把图片拖进页面 --- */
+  var dragDepth = 0;
+
+  function carryingFiles(e) {
+    var dt = e.dataTransfer;
+    if (!dt || !dt.types) { return false; }
+    return Array.prototype.indexOf.call(dt.types, 'Files') >= 0;
+  }
+
+  window.addEventListener('dragenter', function (e) {
+    if (!carryingFiles(e)) { return; }
+    e.preventDefault();
+    dragDepth++;
+    dropzone.classList.add('is-on');
+  });
+
+  window.addEventListener('dragover', function (e) {
+    if (!carryingFiles(e)) { return; }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  window.addEventListener('dragleave', function () {
+    if (dragDepth === 0) { return; }
+    dragDepth--;
+    if (dragDepth === 0) { dropzone.classList.remove('is-on'); }
+  });
+
+  window.addEventListener('dragend', function () {
+    dragDepth = 0;
+    dropzone.classList.remove('is-on');
+  });
+
+  window.addEventListener('drop', function (e) {
+    if (!carryingFiles(e)) { return; }
+    e.preventDefault();
+    dragDepth = 0;
+    dropzone.classList.remove('is-on');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  /* ======================================================================
+     五、入场编排与导航状态
      ====================================================================== */
   var header = $('#siteHeader');
 
@@ -383,17 +749,31 @@
       });
       return;
     }
-    var io = new IntersectionObserver(function (entries) {
+    revealIO = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
           entry.target.classList.add('is-in');
-          io.unobserve(entry.target);
+          revealIO.unobserve(entry.target);
         }
       });
     }, { threshold: 0.06, rootMargin: '0px 0px -6% 0px' });
 
     Array.prototype.forEach.call(document.querySelectorAll('.reveal'), function (el) {
-      io.observe(el);
+      revealIO.observe(el);
+    });
+  }
+
+  /* 取回上次留下的自传图片，按上传先后还原到最前面 */
+  function restoreCustom() {
+    return loadRecords().then(function (recs) {
+      if (!recs || !recs.length) { return; }
+      var list = recs.filter(function (r) { return r && r.blob; })
+                     .sort(function (a, b) { return (a.ts || 0) - (b.ts || 0); });
+      if (!list.length) { return; }
+      list.forEach(function (rec) { mountCustom(rec); });
+      buildFilters();
+      applyFilter(currentTag);
+      paintStats();
     });
   }
 
@@ -403,9 +783,8 @@
     buildFilters();
     layout();
     observeReveals();
+    paintStats();
 
-    $('#statCount').textContent = pad(FRAMES.length);
-    $('#statHero').textContent = pad(HERO.length);
     $('#year').textContent = new Date().getFullYear();
 
     if (!REDUCE) { requestAnimationFrame(loop); }
@@ -415,6 +794,8 @@
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(layout, 140);
     });
+
+    restoreCustom();
   }
 
   init();

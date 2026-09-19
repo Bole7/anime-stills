@@ -1,6 +1,6 @@
 /* ==========================================================================
    components.css — 组件层
-   一、站点导航  二、环幕轮播  三、目录网格  四、关于  五、页脚  六、灯箱
+   一、站点导航  二、环幕轮播  三、目录网格  四、关于  五、页脚  六、灯箱  七、上传
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -215,6 +215,18 @@
 }
 .chip[aria-pressed="true"] .chip__count { color: rgba(250, 249, 245, 0.55); }
 
+/* 上传入口：跟在一排筛选后面，虚线边框以示区别 */
+.chip--add {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+  border-style: dashed;
+  color: var(--ink-3);
+}
+.chip--add:hover { background: none; border-color: var(--ink-2); color: var(--ink); }
+.chip--add.is-busy { opacity: 0.4; pointer-events: none; }
+.chip--add svg { display: block; }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
@@ -269,6 +281,36 @@
   pointer-events: none;
 }
 .card__frame:hover .card__hover { opacity: 1; transform: none; }
+
+/* 自行上传的图片：悬停时右上角浮出移除按钮 */
+.card__remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: rgba(244, 242, 236, 0.92);
+  backdrop-filter: blur(6px);
+  color: var(--ink-2);
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.card:hover .card__remove,
+.card__remove:focus-visible { opacity: 1; }
+.card__remove:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-soft);
+}
 
 .empty {
   padding-block: var(--sp-7);
@@ -387,8 +429,15 @@
 }
 .lightbox.is-open .lightbox__inner { transform: none; }
 
+/* 图片按自身比例缩放：横图撑满宽度，竖图受高度约束，两种都完整可见 */
 .lightbox__img {
-  width: 100%;
+  display: block;
+  justify-self: center;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100vh - 160px);
+  max-height: calc(100svh - 160px);
   background: var(--panel);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-3);
@@ -451,3 +500,59 @@
   .lightbox { padding: var(--sp-3); }
   .lightbox__nav { display: none; }
 }
+
+/* --------------------------------------------------------------------------
+   七、上传
+   -------------------------------------------------------------------------- */
+
+/* 拖拽投放提示：图片拖进页面时盖满一屏，松手即收 */
+.dropzone {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: rgba(244, 242, 236, 0.88);
+  backdrop-filter: blur(14px) saturate(1.05);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    visibility var(--dur-base) var(--ease-out);
+}
+.dropzone.is-on { opacity: 1; visibility: visible; }
+
+.dropzone__box {
+  padding: var(--sp-5) var(--sp-6);
+  border: 1px dashed var(--ink-3);
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  transform: scale(0.98);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.dropzone.is-on .dropzone__box { transform: none; }
+
+/* 结果提示条：底部浮出，两秒多自行退场 */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--sp-5);
+  z-index: 90;
+  margin: 0;
+  padding: 10px 18px;
+  background: var(--ink);
+  color: var(--paper-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 10px);
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
+    visibility var(--dur-base) var(--ease-out);
+}
+.toast.is-on { opacity: 1; visibility: visible; transform: translate(-50%, 0); }

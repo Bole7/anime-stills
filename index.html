@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>近期日漫截图分享</title>
-<meta name="description" content="近期日本动画截图分享站。环幕旋转查看精选画面，可按色调筛选，点击放大阅读字幕细节。">
+<meta name="description" content="近期日本动画截图分享站。环幕旋转查看精选画面，可按色调筛选，点击放大阅读字幕细节，也可以上传自己的图片。">
 <meta name="author" content="王博乐">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -72,6 +72,7 @@
         <div class="about__cols reveal">
           <p>这里收的是近期在追的动画里按下的截图，以《电锯人》为主，混着几部同期作品。挑片子的标准只有一条：这一张单独拿出来，还立得住。</p>
           <p>页面主体是一圈会缓慢自转的环幕 —— 可以拖，可以滚，也可以用方向键一张一张翻。看到想细看的，点开就是原图。</p>
+          <p>目录末尾的 <b aria-hidden="true">＋</b> 可以传自己的图，也可以直接把图片拖进页面。色调标签是浏览器当场算的，跟这批收藏同一套标准。</p>
 
           <dl class="stats">
             <div>
@@ -128,6 +129,15 @@
     </div>
   </div>
 </div>
+
+<!-- ============== 上传：文件选择器 / 拖拽投放区 / 结果提示条 ============== -->
+<input type="file" id="fileInput" accept="image/*" multiple hidden>
+
+<div class="dropzone" id="dropzone" aria-hidden="true">
+  <span class="dropzone__box">松手添加到这里</span>
+</div>
+
+<p class="toast" id="toast" role="status" aria-live="polite"></p>
 
 <script src="scripts/frames-data.js"></script>
 <script src="scripts/main.js"></script>
