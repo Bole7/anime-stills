@@ -1,7 +1,7 @@
 /* ==========================================================================
    components.css — 组件层
    一、站点导航  二、环幕轮播  三、目录网格  四、关于  五、页脚  六、灯箱
-   七、归类浮层  八、上传
+   七、归类浮层  八、上传  九、批量选择
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -731,3 +731,172 @@
     visibility var(--dur-base) var(--ease-out);
 }
 .toast.is-on { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+
+/* --------------------------------------------------------------------------
+   九、批量选择
+   进入选择模式后：卡片左上角浮出选择圈，整张画面点一下就选中；
+   在空白处拖拽还能拉一个框，框住多少选多少。
+   -------------------------------------------------------------------------- */
+
+/* 筛选条末尾的开关，纯图标 + 两个字，跟前面一排筛选状态分开 */
+.chip--pick svg { display: block; }
+
+/* 「恢复隐藏」是动作，用虚线跟一排筛选状态分开，跟 ＋ 号一个路数 */
+.chip--restore { border-style: dashed; }
+
+/* 选择模式下收起单张的操作条，免得跟左上角的选择圈打架 */
+.grid.is-picking .card__tools { display: none; }
+.grid.is-picking .card__hover { display: none; }
+
+.card__pick {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: rgba(244, 242, 236, 0.92);
+  backdrop-filter: blur(6px);
+  color: transparent;
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.card__pick svg { display: block; width: 14px; height: 14px; }
+
+/* 选择模式才现身；一旦选中就常驻，哪怕不悬停也留着 */
+.grid.is-picking .card__pick { opacity: 1; transform: none; pointer-events: auto; }
+.grid.is-picking .card { cursor: pointer; }
+
+.card.is-picked .card__pick {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper-soft);
+}
+/* 选中态：朱红描一圈边，画面轻轻压暗，扫一眼就知道挑了哪几张 */
+.card.is-picked .card__frame {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.card.is-picked .card__img { filter: saturate(0.82) brightness(0.93); }
+
+/* 框选的橡皮筋 */
+.marquee {
+  position: fixed;
+  z-index: 45;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+.marquee[hidden] { display: none; }
+body.is-marquee { user-select: none; }
+
+/* 底部操作条 */
+.selbar {
+  position: fixed;
+  left: 50%;
+  bottom: var(--sp-4);
+  z-index: 80;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  /* fixed 元素的宽度本来是"收缩到合适"，而 left:50% 会把它压到半个视口宽，
+     窄屏上就会挤成一列。显式写 max-content，再用 max-width 兜住。 */
+  width: max-content;
+  max-width: calc(100vw - var(--sp-4) * 2);
+  padding: 10px 14px;
+  background: var(--ink);
+  color: var(--paper-soft);
+  box-shadow: var(--shadow-3);
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 14px);
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
+    visibility var(--dur-base) var(--ease-out);
+}
+.selbar.is-on { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+
+.selbar__count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: rgba(250, 249, 245, 0.62);
+}
+.selbar__count b {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper-soft);
+}
+
+.selbar__btn {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid rgba(250, 249, 245, 0.28);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+  color: var(--paper-soft);
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.selbar__btn:hover { background: rgba(250, 249, 245, 0.14); border-color: rgba(250, 249, 245, 0.5); }
+.selbar__btn[disabled] { opacity: 0.32; pointer-events: none; }
+/* 危险动作先变一次色，再点一下才真的动手 */
+.selbar__btn.is-danger:hover,
+.selbar__btn.is-danger.is-armed {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper-soft);
+}
+.selbar__btn--solid {
+  background: var(--paper-soft);
+  border-color: var(--paper-soft);
+  color: var(--ink);
+}
+.selbar__btn--solid:hover {
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+  color: var(--ink);
+}
+
+.selbar__sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(250, 249, 245, 0.22);
+}
+
+/* 操作条浮在底部，提示条得让开，否则两条叠在一起 */
+body.is-picking .toast { bottom: calc(var(--sp-4) + var(--selbar-h, 56px) + 12px); }
+
+@media (max-width: 720px) {
+  .selbar { gap: 6px 8px; padding: 10px 12px; }
+  .selbar__btn { min-height: 32px; padding: 0 10px; }
+  .selbar__sep { display: none; }
+}
+
+/* 触屏：手指够得着的下限 */
+@media (hover: none), (pointer: coarse) {
+  .selbar__btn { min-height: 40px; padding: 0 14px; }
+  .card__pick { width: 32px; height: 32px; }
+}

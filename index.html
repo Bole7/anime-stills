@@ -73,6 +73,7 @@
           <p>这里收的是近期在追的动画里按下的截图。挑片子的标准只有一条：这一张单独拿出来，还立得住。</p>
           <p>页面主体是一圈会缓慢自转的环幕 —— 可以拖，可以滚，也可以用方向键一张一张翻。看到想细看的，点开就是原图。</p>
           <p>照片按番剧分堆。目录末尾的 <b aria-hidden="true">＋</b> 可以传自己的图、建自己的分类，也可以直接把图片拖到某个分类上。</p>
+          <p>要一次挪一批，就切到<b>选择</b>：点选、按住 Shift 连选、在空白处拖个框圈住一片，再整批搬走或删掉。</p>
 
           <dl class="stats">
             <div>
@@ -132,7 +133,7 @@
 
 <!-- ===================== 归类浮层：点卡片上的"移动到"出现 ===================== -->
 <div class="mover" id="mover" role="dialog" aria-label="移动到分类" hidden>
-  <p class="mover__head">移动到</p>
+  <p class="mover__head" id="moverHead">移动到</p>
   <div class="mover__list" id="moverList"></div>
   <input class="mover__new" id="moverNew" type="text" placeholder="新建分类并移入…" maxlength="24" aria-label="新建分类并移入">
 </div>
@@ -142,6 +143,19 @@
 
 <div class="dropzone" id="dropzone" aria-hidden="true">
   <span class="dropzone__box">松手添加到这里</span>
+</div>
+
+<!-- ================= 批量选择：选中若干张之后底部的操作条 ================= -->
+<div class="selbar" id="selbar" role="toolbar" aria-label="批量操作">
+  <span class="selbar__count">已选 <b id="selCount">0</b> 张</span>
+  <button class="selbar__btn" id="selAll" type="button">全选</button>
+  <button class="selbar__btn" id="selInvert" type="button">反选</button>
+  <button class="selbar__btn" id="selClear" type="button">清空</button>
+  <span class="selbar__sep" aria-hidden="true"></span>
+  <button class="selbar__btn" id="selMove" type="button">移动到</button>
+  <button class="selbar__btn is-danger" id="selDel" type="button"
+          title="移除选中的画面（自传图片会彻底删掉，内置截图只是隐藏，可恢复）">移除</button>
+  <button class="selbar__btn selbar__btn--solid" id="selDone" type="button">完成</button>
 </div>
 
 <p class="toast" id="toast" role="status" aria-live="polite"></p>

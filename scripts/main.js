@@ -3,10 +3,11 @@
    一、分类体系（按番剧名归类：新建 / 改名 / 删除 / 拖拽转移）
    二、环幕轮播（3D 圆柱：自转 / 拖拽惯性 / 吸附 / 键盘 / 触点，画面可自选）
    三、目录网格（分类筛选 + 自传图片的插入与移除）
-   四、归类浮层（触屏与键盘的替代路径）
-   五、灯箱（放大查看 + 键盘导航 + 焦点回收）
-   六、上传（本机图片 → canvas 缩放编码 → 色调统计 → IndexedDB 落盘）
-   七、入场编排与导航状态
+   四、批量选择（点选 / 框选 / 拖拽整批转移 / 批量移除）
+   五、归类浮层（触屏与键盘的替代路径）
+   六、灯箱（放大查看 + 键盘导航 + 焦点回收）
+   七、上传（本机图片 → canvas 缩放编码 → 色调统计 → IndexedDB 落盘）
+   八、入场编排与导航状态
    说明：全部逻辑用普通脚本封装在 IIFE 内，双击本地文件即可运行，
         不依赖任何构建工具与模块加载（避免 file:// 下的跨域限制）。
    ========================================================================== */
@@ -39,6 +40,8 @@
   var ICON = {
     ring: '<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.2 4.4v5h-5"/>',
     move: '<path d="M4 7h6M4 12h5M4 17h6"/><path d="M14 12h7m-3-3 3 3-3 3"/>',
+    pick: '<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="m8 12.3 2.7 2.7 5.3-6"/>',
+    check: '<path d="m5 12.4 4.6 4.6L19 7.4"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>'
   };
   function icon(paths) {
@@ -65,6 +68,7 @@
   var LS_SERIES = 'anime-stills:series';
   var LS_ASSIGN = 'anime-stills:assign';
   var LS_HERO = 'anime-stills:hero';
+  var LS_HIDDEN = 'anime-stills:hidden';
 
   function readLS(key, fallback) {
     try {
@@ -81,8 +85,20 @@
   var seriesList = readLS(LS_SERIES, []);
   var assignMap = readLS(LS_ASSIGN, {});
   var heroMap = readLS(LS_HERO, {});
+  /* 被"移除"的内置截图记在这里。内置素材是仓库里的文件，删不掉，
+     所以对它们来说"删除"等于隐藏 —— 记一笔，随时能整批恢复。 */
+  var hiddenSet = readLS(LS_HIDDEN, {});
   if (!Array.isArray(seriesList)) { seriesList = []; }
   seriesList = seriesList.filter(function (s) { return s && s.id && s.name; });
+
+  function isHidden(f) { return !!hiddenSet[String(f.id)]; }
+  /* 目录里真正露面的那些：内置素材减去被隐藏的 */
+  function shownFrames() {
+    return FRAMES.filter(function (f) { return !isHidden(f); });
+  }
+  function hiddenCount() {
+    return FRAMES.filter(function (f) { return isHidden(f); }).length;
+  }
 
   function newSeriesId() {
     return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
@@ -106,8 +122,9 @@
     return s ? s.name : '未分类';
   }
   function countIn(id) {
-    if (id === ALL) { return FRAMES.length; }
-    return FRAMES.filter(function (f) { return seriesOf(f) === id; }).length;
+    var list = shownFrames();
+    if (id === ALL) { return list.length; }
+    return list.filter(function (f) { return seriesOf(f) === id; }).length;
   }
 
   function createSeries(name) {
@@ -142,21 +159,33 @@
     return members.length;
   }
 
-  function moveFrame(f, id) {
+  /* 转移归类：单张与整批走同一条路，差别只在传进来几张 */
+  function moveFrames(list, id) {
+    if (!list || !list.length) { return false; }
     if (!liveSeries(id)) { return false; }
-    if (seriesOf(f) === id) {
-      toast('已经归在「' + seriesName(id) + '」里了');
+
+    var moved = 0;
+    list.forEach(function (f) {
+      if (seriesOf(f) === id) { return; }        // 已经在这一类里的跳过
+      assignMap[String(f.id)] = id;
+      if (f.custom) { patchRecord(f.id, { series: id }); }
+      var card = grid.querySelector('.card[data-id="' + f.id + '"]');
+      if (card) { card.dataset.series = id; }
+      moved++;
+    });
+
+    if (!moved) {
+      toast(list.length > 1
+        ? '这几张已经都在「' + seriesName(id) + '」里了'
+        : '已经归在「' + seriesName(id) + '」里了');
       return false;
     }
-    assignMap[String(f.id)] = id;
+
     writeLS(LS_ASSIGN, assignMap);
-    if (f.custom) { patchRecord(f.id, { series: id }); }
-
-    var card = grid.querySelector('.card[data-id="' + f.id + '"]');
-    if (card) { card.dataset.series = id; }
-
     refreshFilters();
-    toast('已移到「' + seriesName(id) + '」');
+    toast(list.length > 1
+      ? '已把 ' + moved + ' 张移到「' + seriesName(id) + '」'
+      : '已移到「' + seriesName(id) + '」');
     return true;
   }
 
@@ -167,7 +196,10 @@
     var o = heroMap[String(f.id)];
     return o === undefined ? !!f.hero : !!o;
   }
-  function heroFrames() { return FRAMES.filter(inHero); }
+  function heroFrames() {
+    // 被隐藏的画面自动退出环幕，不用单独维护一份名单
+    return FRAMES.filter(function (f) { return inHero(f) && !isHidden(f); });
+  }
 
   function setHero(f, on) {
     if (!on && heroFrames().length <= HERO_MIN) {
@@ -320,6 +352,7 @@
 
   /* --- 渲染：只在当前画面变化时才写 DOM --- */
   function render() {
+    if (!HERO.length) { return; }        // 全部撤下环幕时别去 mod 0
     ring.style.transform = 'rotateY(' + angle.toFixed(3) + 'deg)';
     var idx = mod(Math.round(-angle / STEP), HERO.length);
     if (idx !== activeIndex) {
@@ -372,13 +405,20 @@
     auto = false;
   }, { passive: false });
 
-  /* --- 键盘：← → 翻一张，空格切自动旋转 --- */
+  /* --- 键盘：← → 翻一张，空格切自动旋转，Esc 退出选择 --- */
   document.addEventListener('keydown', function (e) {
     if (lb.classList.contains('is-open')) { return; }
     var tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea') { return; }
 
-    if (e.key === 'Escape') { closeMover(); }
+    if (e.key === 'Escape') {
+      if (!mover.hidden) { closeMover(); }
+      else if (selectMode) { setSelectMode(false); }
+    }
+    else if (selectMode && (e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault();
+      pickAll();
+    }
     else if (e.key === 'ArrowLeft') { auto = false; stepBy(-1); }
     else if (e.key === 'ArrowRight') { auto = false; stepBy(1); }
     else if (e.key === ' ' && document.activeElement === document.body) {
@@ -397,7 +437,8 @@
   var revealIO = null;
   var addBtn = null;
   var newBtn = null;
-  var dragFrame = null;            // 正在被拖动的画面
+  var selChip = null;
+  var dragFrames = null;           // 正在被拖动的画面（可能是一批）
 
   function buildCard(f, i) {
     var card = document.createElement('figure');
@@ -431,8 +472,24 @@
       view.appendChild(hover);
     }
 
-    view.addEventListener('click', function () { openLightbox(f); });
+    view.addEventListener('click', function (e) {
+      // 选择模式下点画面是「挑中它」，不打开灯箱
+      if (selectMode) { togglePick(f, e.shiftKey); return; }
+      openLightbox(f);
+    });
     card.appendChild(view);
+
+    /* --- 左上角的选择圈：只在选择模式里现身 --- */
+    var pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 'card__pick';
+    pick.setAttribute('aria-label', '选中这张');
+    pick.innerHTML = icon(ICON.check);
+    pick.addEventListener('click', function (e) {
+      e.stopPropagation();
+      togglePick(f, e.shiftKey);
+    });
+    card.appendChild(pick);
 
     /* --- 右上角操作条 ---
        桌面：悬停浮出三个（归类 / 环幕 / 移除）
@@ -444,7 +501,7 @@
     var tMove = iconBtn('移动到分类', ICON.move);
     tMove.addEventListener('click', function (e) {
       e.stopPropagation();
-      openMover(f, tMove);
+      openMover([f], tMove);
     });
     tools.appendChild(tMove);
 
@@ -480,10 +537,18 @@
     }
     card.appendChild(tools);
 
-    /* --- 拖拽：把这张图拖到某个分类上 --- */
+    /* --- 拖拽：把这张图拖到某个分类上 ---
+       如果这张正好在被选中的那一批里，拖的就是整批 —— 省得一张一张搬 */
     card.addEventListener('dragstart', function (e) {
-      dragFrame = f;
-      card.classList.add('is-dragging');
+      var batch = (selectMode && picked[String(f.id)] && pickCount() > 1)
+        ? pickedFrames()
+        : [f];
+      dragFrames = batch;
+      batch.forEach(function (x) {
+        var el = grid.querySelector('.card[data-id="' + x.id + '"]');
+        if (el) { el.classList.add('is-dragging'); }
+      });
+
       if (!e.dataTransfer) { return; }
       e.dataTransfer.effectAllowed = 'move';
       // 自定义类型用来跟"把本机图片拖进页面"区分开
@@ -491,19 +556,37 @@
       try { e.dataTransfer.setData('text/plain', String(f.id)); } catch (err) {}
     });
     card.addEventListener('dragend', function () {
-      dragFrame = null;
-      card.classList.remove('is-dragging');
+      dragFrames = null;
+      Array.prototype.forEach.call(grid.querySelectorAll('.is-dragging'), function (el) {
+        el.classList.remove('is-dragging');
+      });
       clearDropHints();
     });
 
     return card;
   }
 
-  function renderGrid() {
+  /* revealNow=true 时留给 IntersectionObserver 播入场（首次渲染用）；
+     其余情况整表重建，直接呈现，免得删几张之后整屏重播一次入场动画 */
+  function renderGrid(revealNow) {
     var frag = document.createDocumentFragment();
-    FRAMES.forEach(function (f, i) { frag.appendChild(buildCard(f, i)); });
+    FRAMES.forEach(function (f, i) {
+      if (isHidden(f)) { return; }
+      frag.appendChild(buildCard(f, i));
+    });
     grid.innerHTML = '';
     grid.appendChild(frag);
+
+    if (revealNow) {
+      if (revealIO) {
+        Array.prototype.forEach.call(grid.children, function (el) { revealIO.observe(el); });
+      }
+      return;
+    }
+    Array.prototype.forEach.call(grid.children, function (el) {
+      el.style.transitionDelay = '0ms';
+      el.classList.add('is-in');
+    });
   }
 
   /* 新图片插到最前面，跟数据数组的顺序保持一致 */
@@ -546,7 +629,7 @@
       // 「全部」是聚合视图，不是分类，所以不接受拖放
       if (it.id !== ALL) {
         chip.addEventListener('dragover', function (e) {
-          if (!dragFrame) { return; }
+          if (!dragFrames) { return; }
           e.preventDefault();
           if (e.dataTransfer) { e.dataTransfer.dropEffect = 'move'; }
           chip.classList.add('is-drop');
@@ -554,10 +637,10 @@
         chip.addEventListener('dragleave', function () { chip.classList.remove('is-drop'); });
         chip.addEventListener('drop', function (e) {
           chip.classList.remove('is-drop');
-          if (!dragFrame) { return; }
+          if (!dragFrames) { return; }
           e.preventDefault();
           e.stopPropagation();
-          moveFrame(dragFrame, it.id);
+          moveFrames(dragFrames, it.id);
         });
       }
 
@@ -622,6 +705,29 @@
       '<span>分类</span>';
     newBtn.addEventListener('click', openNewSeries);
     filters.appendChild(newBtn);
+
+    // 批量选择的开关。放在最后，跟前面一串筛选状态分开
+    selChip = document.createElement('button');
+    selChip.type = 'button';
+    selChip.id = 'selChip';
+    selChip.className = 'chip chip--pick';
+    selChip.title = '批量选择画面';
+    selChip.setAttribute('aria-pressed', 'false');
+    selChip.innerHTML = icon(ICON.pick) + '<span>选择</span>';
+    selChip.addEventListener('click', function () { setSelectMode(!selectMode); });
+    filters.appendChild(selChip);
+
+    // 有隐藏的画面才出现，点一下整批放回来
+    var hid = hiddenCount();
+    if (hid) {
+      var restoreChip = document.createElement('button');
+      restoreChip.type = 'button';
+      restoreChip.className = 'chip chip--restore';
+      restoreChip.title = '把隐藏的内置截图放回目录';
+      restoreChip.innerHTML = '<span>恢复隐藏</span><span class="chip__count">' + pad(hid) + '</span>';
+      restoreChip.addEventListener('click', restoreHidden);
+      filters.appendChild(restoreChip);
+    }
   }
 
   /* 就地变成输入框新建分类——不弹系统对话框 */
@@ -717,15 +823,15 @@
     empty.hidden = shown > 0;
   }
 
-  /* 供灯箱使用：当前筛选下真正可见的画面 */
+  /* 当前筛选下真正露面的画面：灯箱翻页、全选、框选都以它为准 */
   function visibleFrames() {
-    return FRAMES.filter(function (f) {
+    return shownFrames().filter(function (f) {
       return currentSeries === ALL || seriesOf(f) === currentSeries;
     });
   }
 
   function paintStats() {
-    $('#statCount').textContent = pad(FRAMES.length);
+    $('#statCount').textContent = pad(shownFrames().length);
     $('#statHero').textContent = pad(heroFrames().length);
     $('#statSeries').textContent = pad(seriesList.length);
   }
@@ -736,17 +842,290 @@
     applyFilter(currentSeries);
     paintStats();
     closeMover();
+    syncPickUI();
   }
 
   /* ======================================================================
-     四、归类浮层
+     四、批量选择
+     一屏几十张的时候一张一张点太慢，所以给三种选法：
+     点一下挑一张、按住 Shift 连选一段、在空白处拖个框圈住一片。
+     选完可以整批搬去某个分类，也可以整批移除。
+     ====================================================================== */
+  var selbar = $('#selbar');
+  var selCount = $('#selCount');
+  var selBtnMove = $('#selMove');
+  var selBtnDel = $('#selDel');
+  var indexSection = $('#index');
+
+  var selectMode = false;
+  var picked = {};                 // id -> true
+  var lastPickedId = null;         // 供 Shift 连选定位
+  var lastBarH = -1;
+
+  function pickCount() { return Object.keys(picked).length; }
+  function pickedFrames() {
+    return FRAMES.filter(function (f) { return picked[String(f.id)]; });
+  }
+  function copyPicked() {
+    var o = {};
+    Object.keys(picked).forEach(function (k) { o[k] = true; });
+    return o;
+  }
+
+  /* --- 状态一变就重绘：计数、卡片描边、底部操作条 --- */
+  function syncPickUI() {
+    Array.prototype.forEach.call(grid.children, function (card) {
+      card.classList.toggle('is-picked', !!picked[card.dataset.id]);
+    });
+
+    var n = pickCount();
+    selCount.textContent = n;
+    selbar.classList.toggle('is-on', selectMode);
+    grid.classList.toggle('is-picking', selectMode);
+    document.body.classList.toggle('is-picking', selectMode);
+
+    selBtnMove.disabled = n === 0;
+    selBtnDel.disabled = n === 0;
+
+    if (selChip) { selChip.setAttribute('aria-pressed', selectMode ? 'true' : 'false'); }
+
+    // 提示条得让开操作条，所以先把操作条的高度量下来存进变量
+    if (selectMode) {
+      var h = selbar.offsetHeight;
+      if (h && h !== lastBarH) {
+        lastBarH = h;
+        document.body.style.setProperty('--selbar-h', h + 'px');
+      }
+    } else if (lastBarH !== -1) {
+      lastBarH = -1;
+      document.body.style.removeProperty('--selbar-h');
+    }
+  }
+
+  function setSelectMode(on) {
+    on = !!on;
+    if (on === selectMode) { return; }
+    selectMode = on;
+    disarmDel();
+    if (!selectMode) {
+      picked = {};
+      lastPickedId = null;
+      mqEnd();
+      closeMover();
+    }
+    syncPickUI();
+    toast(selectMode
+      ? (NO_HOVER ? '点一下画面选中，再点一下取消' : '点画面选中，Shift 连选，空白处拖框圈一片')
+      : '已退出选择');
+  }
+
+  function togglePick(f, range) {
+    var id = String(f.id);
+
+    // Shift：把上一次点的那张到这一张之间整段一起选上
+    if (range && lastPickedId) {
+      var list = visibleFrames();
+      var a = -1, b = -1, i;
+      for (i = 0; i < list.length; i++) {
+        var k = String(list[i].id);
+        if (k === lastPickedId) { a = i; }
+        if (k === id) { b = i; }
+      }
+      if (a >= 0 && b >= 0) {
+        var on = !picked[id];
+        for (i = Math.min(a, b); i <= Math.max(a, b); i++) {
+          var ki = String(list[i].id);
+          if (on) { picked[ki] = true; } else { delete picked[ki]; }
+        }
+        lastPickedId = id;
+        syncPickUI();
+        return;
+      }
+    }
+
+    if (picked[id]) { delete picked[id]; } else { picked[id] = true; }
+    lastPickedId = id;
+    syncPickUI();
+  }
+
+  /* 全选 / 反选 / 清空都只看当前筛选下露面的那些 */
+  function pickAll() {
+    visibleFrames().forEach(function (f) { picked[String(f.id)] = true; });
+    syncPickUI();
+  }
+  function pickInvert() {
+    visibleFrames().forEach(function (f) {
+      var id = String(f.id);
+      if (picked[id]) { delete picked[id]; } else { picked[id] = true; }
+    });
+    syncPickUI();
+  }
+  function pickNone() {
+    picked = {};
+    lastPickedId = null;
+    syncPickUI();
+  }
+
+  /* --- 框选：在空白处按住拖出一个矩形，压到多少选多少 ---
+     只走鼠标：触屏上按住拖动是滚动页面，硬接管会跟系统手势打架 */
+  var marqueeEl = null;
+  var mqFrom = null;
+  var mqBase = null;
+
+  function mqMove(e) {
+    if (!mqFrom) { return; }
+    var x = e.clientX, y = e.clientY;
+    if (Math.abs(x - mqFrom.x) < 4 && Math.abs(y - mqFrom.y) < 4) { return; }
+
+    var box = {
+      l: Math.min(x, mqFrom.x), t: Math.min(y, mqFrom.y),
+      r: Math.max(x, mqFrom.x), b: Math.max(y, mqFrom.y)
+    };
+    marqueeEl.hidden = false;
+    marqueeEl.style.left = box.l + 'px';
+    marqueeEl.style.top = box.t + 'px';
+    marqueeEl.style.width = (box.r - box.l) + 'px';
+    marqueeEl.style.height = (box.b - box.t) + 'px';
+    document.body.classList.add('is-marquee');
+
+    // 按住 Shift 是在原有选择上叠加，否则每一帧都按框重算
+    var next = mqBase || {};
+    Array.prototype.forEach.call(grid.children, function (card) {
+      if (card.classList.contains('is-hidden')) { return; }
+      var r = card.getBoundingClientRect();
+      if (r.right > box.l && r.left < box.r && r.bottom > box.t && r.top < box.b) {
+        next[card.dataset.id] = true;
+      }
+    });
+    picked = next;
+    syncPickUI();
+  }
+
+  function mqEnd() {
+    mqFrom = null;
+    mqBase = null;
+    if (marqueeEl) { marqueeEl.hidden = true; }
+    document.body.classList.remove('is-marquee');
+    document.removeEventListener('pointermove', mqMove);
+    document.removeEventListener('pointerup', mqEnd);
+    document.removeEventListener('pointercancel', mqEnd);
+  }
+
+  indexSection.addEventListener('pointerdown', function (e) {
+    if (!selectMode || NO_HOVER) { return; }
+    if (e.button !== undefined && e.button !== 0) { return; }
+    // 卡片、筛选条、按钮上的按下都不算框选
+    if (e.target.closest && e.target.closest('.card, .chip, .chip-slot, .selbar, a, button, input')) {
+      return;
+    }
+    e.preventDefault();
+
+    if (!marqueeEl) {
+      marqueeEl = document.createElement('div');
+      marqueeEl.className = 'marquee';
+      marqueeEl.hidden = true;
+      document.body.appendChild(marqueeEl);
+    }
+    mqFrom = { x: e.clientX, y: e.clientY };
+    mqBase = e.shiftKey ? copyPicked() : null;
+    document.addEventListener('pointermove', mqMove);
+    document.addEventListener('pointerup', mqEnd);
+    document.addEventListener('pointercancel', mqEnd);
+  });
+
+  /* --- 移除：自传图片是真删且不可逆，所以让它多按一下 --- */
+  var delArmed = false;
+  var delTimer = null;
+
+  function disarmDel() {
+    delArmed = false;
+    clearTimeout(delTimer);
+    selBtnDel.textContent = '移除';
+    selBtnDel.classList.remove('is-armed');
+  }
+
+  /* 批量移除：自传的真删，内置的记一笔隐藏（可整批恢复） */
+  function removeFrames(list) {
+    if (!list || !list.length) { return; }
+
+    var gone = 0, hid = 0, ringDirty = false;
+    list.forEach(function (f) {
+      if (f.custom) {
+        if (removeCustomCore(f)) { ringDirty = true; }
+        gone++;
+      } else {
+        hiddenSet[String(f.id)] = true;
+        delete picked[String(f.id)];
+        hid++;
+      }
+    });
+
+    writeLS(LS_HIDDEN, hiddenSet);
+    // 撤掉的画面可能正在环幕上，名单一变就得重算夹角
+    if (ringDirty || hid) { buildRing(); }
+    renderGrid();
+    refreshFilters();
+
+    var msg = [];
+    if (gone) { msg.push('移除 ' + gone + ' 张'); }
+    if (hid) { msg.push('隐藏 ' + hid + ' 张内置截图，点「恢复隐藏」能放回来'); }
+    toast(msg.join('，'));
+  }
+
+  function restoreHidden() {
+    hiddenSet = {};
+    writeLS(LS_HIDDEN, hiddenSet);
+    renderGrid();
+    buildRing();
+    refreshFilters();
+    toast('已把隐藏的画面放回目录');
+  }
+
+  $('#selAll').addEventListener('click', pickAll);
+  $('#selInvert').addEventListener('click', pickInvert);
+  $('#selClear').addEventListener('click', pickNone);
+  $('#selDone').addEventListener('click', function () { setSelectMode(false); });
+
+  selBtnMove.addEventListener('click', function () {
+    var list = pickedFrames();
+    if (!list.length) { return; }
+    openMover(list, selBtnMove);
+  });
+
+  selBtnDel.addEventListener('click', function () {
+    var list = pickedFrames();
+    if (!list.length) { return; }
+
+    var customN = list.filter(function (f) { return f.custom; }).length;
+    // 只有内置截图时不用确认 —— 隐藏随时能还原
+    if (customN && !delArmed) {
+      delArmed = true;
+      selBtnDel.textContent = '确认删掉 ' + customN + ' 张？';
+      selBtnDel.classList.add('is-armed');
+      clearTimeout(delTimer);
+      delTimer = setTimeout(disarmDel, 3600);
+      return;
+    }
+    disarmDel();
+    removeFrames(list);
+  });
+
+  window.addEventListener('resize', function () {
+    if (!selectMode) { return; }
+    lastBarH = -1;               // 屏幕尺寸变了，操作条高度得重新量
+    syncPickUI();
+  });
+
+  /* ======================================================================
+     五、归类浮层
      拖拽是最快的路径，但触屏上没有 hover、也不好精确落到某个 chip 上，
-     所以每条画面再给一个明确的文字入口，两条路都落到 moveFrame。
+     所以每条画面再给一个明确的文字入口，两条路都落到 moveFrames。
      ====================================================================== */
   var mover = $('#mover');
   var moverList = $('#moverList');
   var moverNew = $('#moverNew');
-  var moverFrame = null;
+  var moverHead = $('#moverHead');
+  var moverFrames = null;          // 待归类的一批（单张也是一个元素的数组）
 
   function placeMover(anchor) {
     var r = anchor.getBoundingClientRect();
@@ -776,7 +1155,7 @@
   function buildMoverActs(f) {
     var old = mover.querySelector('.mover__acts');
     if (old) { old.parentNode.removeChild(old); }
-    if (!NO_HOVER) { return; }
+    if (!NO_HOVER || !f) { return; }
 
     var acts = document.createElement('div');
     acts.className = 'mover__acts';
@@ -809,8 +1188,12 @@
     mover.appendChild(acts);
   }
 
-  function openMover(f, anchor) {
-    moverFrame = f;
+  function openMover(list, anchor) {
+    moverFrames = list.slice();
+
+    var only = moverFrames.length === 1 ? moverFrames[0] : null;
+    moverHead.textContent = only ? '移动到' : '移动 ' + moverFrames.length + ' 张到';
+
     moverList.innerHTML = '';
 
     var opts = [{ id: UNSORTED, name: '未分类' }].concat(
@@ -820,7 +1203,7 @@
     opts.forEach(function (o) {
       var item = document.createElement('button');
       item.type = 'button';
-      item.className = 'mover__item' + (seriesOf(f) === o.id ? ' is-current' : '');
+      item.className = 'mover__item' + (only && seriesOf(only) === o.id ? ' is-current' : '');
 
       item.appendChild(document.createTextNode(o.name));
       var c = document.createElement('span');
@@ -828,33 +1211,35 @@
       item.appendChild(c);
 
       item.addEventListener('click', function () {
+        var batch = moverFrames;
         closeMover();
-        moveFrame(f, o.id);
+        moveFrames(batch, o.id);
       });
       moverList.appendChild(item);
     });
 
     moverNew.value = '';
     mover.hidden = false;
-    buildMoverActs(f);
+    // 触屏专用的那条动作栏只对单张有意义，整批时不出现
+    buildMoverActs(only);
     placeMover(anchor);
   }
 
   function closeMover() {
     if (mover.hidden) { return; }
     mover.hidden = true;
-    moverFrame = null;
+    moverFrames = null;
   }
 
   moverNew.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { closeMover(); return; }
-    if (e.key !== 'Enter' || !moverFrame) { return; }
+    if (e.key !== 'Enter' || !moverFrames) { return; }
     var v = moverNew.value.trim();
     if (!v) { return; }
-    var f = moverFrame;
+    var batch = moverFrames;
     var s = createSeries(v);
     closeMover();
-    moveFrame(f, s.id);
+    moveFrames(batch, s.id);
   });
 
   // 点到浮层外面就收起来
@@ -1127,6 +1512,11 @@
     return FRAMES.filter(function (f) { return f.custom; }).length;
   }
 
+  /* 上传的图落到哪儿：正看着某个分类就进那个分类，否则进「未分类」 */
+  function uploadTarget() {
+    return currentSeries !== ALL ? currentSeries : UNSORTED;
+  }
+
   function mountCustom(rec) {
     var f = {
       id: rec.id,
@@ -1144,8 +1534,7 @@
 
     /* 归属：记录里有就用它，否则跟随上传时所在的分类 ——
        在「电锯人」分类下上传的图，直接就进「电锯人」 */
-    var target = (rec.series && liveSeries(rec.series)) ? rec.series
-               : (currentSeries !== ALL ? currentSeries : UNSORTED);
+    var target = (rec.series && liveSeries(rec.series)) ? rec.series : uploadTarget();
     assignMap[String(rec.id)] = target;
     writeLS(LS_ASSIGN, assignMap);
     rec.series = target;
@@ -1198,7 +1587,7 @@
       if (addBtn) { addBtn.classList.remove('is-busy'); }
       refreshFilters();
 
-      var msg = ok ? '已加入 ' + ok + ' 张到「' + seriesName(currentSeries) + '」' : '没能读进来';
+      var msg = ok ? '已加入 ' + ok + ' 张到「' + seriesName(uploadTarget()) + '」' : '没能读进来';
       if (bad) { msg += '，' + bad + ' 张跳过'; }
       if (skipped) { msg += '，另有 ' + skipped + ' 张超出上限'; }
       if (dbFailed) { msg += '（本次有效）'; }
@@ -1206,7 +1595,8 @@
     });
   }
 
-  function removeCustom(f) {
+  /* 拆掉一张自传图片，返回它原先在不在环幕上（调用方据此决定要不要重建环幕） */
+  function removeCustomCore(f) {
     var wasHero = heroMap[String(f.id)] === true;
 
     var i = FRAMES.indexOf(f);
@@ -1218,11 +1608,15 @@
     if (f.src) { URL.revokeObjectURL(f.src); }
     delete assignMap[String(f.id)];
     delete heroMap[String(f.id)];
+    delete picked[String(f.id)];
     writeLS(LS_ASSIGN, assignMap);
     writeLS(LS_HERO, heroMap);
     dropRecord(f.id);
+    return wasHero;
+  }
 
-    if (wasHero) { buildRing(); }
+  function removeCustom(f) {
+    if (removeCustomCore(f)) { buildRing(); }
     refreshFilters();
     toast('已移除');
   }
@@ -1328,11 +1722,12 @@
   /* --- 启动 --- */
   function init() {
     buildRing();
-    renderGrid();
+    renderGrid(true);              // 首次渲染，入场交给 IntersectionObserver
     buildFilters();
     observeReveals();
     paintStats();
     applyFilter(currentSeries);
+    syncPickUI();
 
     $('#year').textContent = new Date().getFullYear();
 
