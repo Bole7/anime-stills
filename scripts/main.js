@@ -564,7 +564,7 @@
       slot.appendChild(chip);
 
       if (it.own) {
-        chip.title = it.name + '（双击改名）';
+        chip.title = it.name + (NO_HOVER ? '（长按改名）' : '（双击改名）');
         chip.addEventListener('dblclick', function () { openRename(chip, it); });
 
         // 触屏上没有双击，长按同样能改名

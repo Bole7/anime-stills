@@ -388,11 +388,13 @@
 .card.is-dragging { opacity: 0.35; }
 .card.is-dragging .card__tools { opacity: 0; }
 
-/* 触屏上卡片只剩一个入口，所以让它常驻；36px 是手指够得着的下限 */
+/* 触屏上卡片只剩一个入口，所以让它常驻；36px 是手指够得着的下限。
+   分类 chip 的删除按钮同理 —— 没有 hover 它就永远不显形 */
 @media (hover: none), (pointer: coarse) {
   .card__tools { opacity: 1; }
   .card__tools button { width: 36px; height: 36px; }
   .card__tools button svg { width: 16px; height: 16px; }
+  .chip__del { opacity: 1; }
 }
 
 .empty {
