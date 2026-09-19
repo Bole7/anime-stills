@@ -1,6 +1,7 @@
 /* ==========================================================================
    components.css — 组件层
-   一、站点导航  二、环幕轮播  三、目录网格  四、关于  五、页脚  六、灯箱  七、上传
+   一、站点导航  二、环幕轮播  三、目录网格  四、关于  五、页脚  六、灯箱
+   七、归类浮层  八、上传
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -227,6 +228,63 @@
 .chip--add.is-busy { opacity: 0.4; pointer-events: none; }
 .chip--add svg { display: block; }
 
+/* 新建分类：这个是动作，不是筛选状态，所以必须带两个字 */
+.chip--add.chip--new {
+  width: auto;
+  padding: 0 var(--sp-4);
+  gap: 6px;
+}
+.chip--add.chip--new span { font-size: var(--fs-sm); }
+
+/* 自定义分类：chip 右端留出位置给删除按钮，悬停时浮出 */
+.chip-slot { position: relative; display: inline-flex; }
+.chip--own { padding-right: 40px; }
+
+.chip__del {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  color: var(--ink-3);
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.chip-slot:hover .chip__del,
+.chip__del:focus-visible { opacity: 1; }
+.chip__del:hover { background: var(--accent); color: var(--paper-soft); }
+.chip__del svg { display: block; }
+
+/* 拖拽悬停：这一格就是落脚点 */
+.chip.is-drop,
+.chip.is-drop:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-soft);
+}
+.chip.is-drop .chip__count { color: rgba(250, 249, 245, 0.55); }
+
+/* 新建 / 改名：就地变成一个输入框，不弹系统对话框 */
+.chip-input {
+  min-height: 44px;
+  width: 168px;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--paper-soft);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+.chip-input:focus { outline: none; }
+.chip-input::placeholder { color: var(--ink-3); }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
@@ -282,12 +340,21 @@
 }
 .card__frame:hover .card__hover { opacity: 1; transform: none; }
 
-/* 自行上传的图片：悬停时右上角浮出移除按钮 */
-.card__remove {
+/* 卡片右上角的操作条：悬停或键盘聚焦时浮出 */
+.card__tools {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 2;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.card:hover .card__tools,
+.card__tools:focus-within { opacity: 1; }
+
+.card__tools button {
   width: 30px;
   height: 30px;
   display: grid;
@@ -297,19 +364,35 @@
   background: rgba(244, 242, 236, 0.92);
   backdrop-filter: blur(6px);
   color: var(--ink-2);
-  opacity: 0;
   transition:
-    opacity var(--dur-fast) var(--ease-out),
     background-color var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
 }
-.card:hover .card__remove,
-.card__remove:focus-visible { opacity: 1; }
-.card__remove:hover {
+.card__tools button:hover {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--paper-soft);
+}
+/* 已经在环幕上的那张：图标点亮成朱红，一眼看得出状态 */
+.card__tools button.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.card__tools button.is-on:hover {
+  background: var(--accent);
+  color: var(--paper-soft);
+}
+
+/* 正在被拖走的卡片 */
+.card.is-dragging { opacity: 0.35; }
+.card.is-dragging .card__tools { opacity: 0; }
+
+/* 触屏上卡片只剩一个入口，所以让它常驻；36px 是手指够得着的下限 */
+@media (hover: none), (pointer: coarse) {
+  .card__tools { opacity: 1; }
+  .card__tools button { width: 36px; height: 36px; }
+  .card__tools button svg { width: 16px; height: 16px; }
 }
 
 .empty {
@@ -502,7 +585,97 @@
 }
 
 /* --------------------------------------------------------------------------
-   七、上传
+   七、归类浮层
+   触屏点不了拖拽，也不方便精确拖到某一个 chip 上，所以留一个文字入口
+   -------------------------------------------------------------------------- */
+.mover {
+  position: fixed;
+  z-index: 50;
+  width: 212px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-3);
+}
+.mover[hidden] { display: none; }
+.mover__head {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+.mover__list {
+  display: grid;
+  gap: 2px;
+  max-height: 216px;
+  overflow-y: auto;
+}
+.mover__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.mover__item:hover { background: var(--paper-soft); color: var(--ink); }
+.mover__item span {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+/* 这张图现在所在的分类，用朱红标出来 */
+.mover__item.is-current { color: var(--accent); }
+.mover__item.is-current span { color: var(--accent); }
+
+.mover__new {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  background: none;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+.mover__new:focus { outline: none; border-style: solid; border-color: var(--ink); }
+.mover__new::placeholder { color: var(--ink-3); }
+
+/* 触屏专用：环幕开关与移除都收到这里 */
+.mover__acts {
+  display: grid;
+  gap: 2px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+.mover__act {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.mover__act svg { flex: none; color: var(--ink-3); }
+.mover__act:hover { background: var(--paper-soft); color: var(--ink); }
+.mover__act.is-danger:hover { color: var(--accent); }
+.mover__act.is-danger:hover svg { color: var(--accent); }
+
+/* --------------------------------------------------------------------------
+   八、上传
    -------------------------------------------------------------------------- */
 
 /* 拖拽投放提示：图片拖进页面时盖满一屏，松手即收 */

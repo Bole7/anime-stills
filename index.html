@@ -52,9 +52,9 @@
   <!-- =========================== 二、目录 =========================== -->
   <section class="index" id="index" aria-label="截图目录">
     <div class="shell">
-      <div class="filters" id="filters" role="group" aria-label="按色调筛选"></div>
+      <div class="filters" id="filters" role="group" aria-label="按番剧分类筛选"></div>
       <div class="grid" id="grid"></div>
-      <p class="empty" id="empty" hidden>这个色调下暂时没有画面。</p>
+      <p class="empty" id="empty" hidden>这个分类下暂时没有画面。</p>
     </div>
   </section>
 
@@ -70,9 +70,9 @@
         </p>
 
         <div class="about__cols reveal">
-          <p>这里收的是近期在追的动画里按下的截图，以《电锯人》为主，混着几部同期作品。挑片子的标准只有一条：这一张单独拿出来，还立得住。</p>
+          <p>这里收的是近期在追的动画里按下的截图。挑片子的标准只有一条：这一张单独拿出来，还立得住。</p>
           <p>页面主体是一圈会缓慢自转的环幕 —— 可以拖，可以滚，也可以用方向键一张一张翻。看到想细看的，点开就是原图。</p>
-          <p>目录末尾的 <b aria-hidden="true">＋</b> 可以传自己的图，也可以直接把图片拖进页面。色调标签是浏览器当场算的，跟这批收藏同一套标准。</p>
+          <p>照片按番剧分堆。目录末尾的 <b aria-hidden="true">＋</b> 可以传自己的图、建自己的分类，也可以直接把图片拖到某个分类上。</p>
 
           <dl class="stats">
             <div>
@@ -84,8 +84,8 @@
               <dd id="statHero">08</dd>
             </div>
             <div>
-              <dt>Batches</dt>
-              <dd>02</dd>
+              <dt>Series</dt>
+              <dd id="statSeries">00</dd>
             </div>
           </dl>
         </div>
@@ -128,6 +128,13 @@
       <span id="lbMeta"></span>
     </div>
   </div>
+</div>
+
+<!-- ===================== 归类浮层：点卡片上的"移动到"出现 ===================== -->
+<div class="mover" id="mover" role="dialog" aria-label="移动到分类" hidden>
+  <p class="mover__head">移动到</p>
+  <div class="mover__list" id="moverList"></div>
+  <input class="mover__new" id="moverNew" type="text" placeholder="新建分类并移入…" maxlength="24" aria-label="新建分类并移入">
 </div>
 
 <!-- ============== 上传：文件选择器 / 拖拽投放区 / 结果提示条 ============== -->
