@@ -1,4 +1,4 @@
-/* 素材清单：由 build-assets 流程自动生成，含每帧的色调分析结果 */
+/* 素材清单：由 build-assets 流程自动生成，含每张的色调分析结果 */
 window.ANIME_FRAMES = {
  "ratio": 1.8155,
  "count": 53,

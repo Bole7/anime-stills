@@ -28,11 +28,6 @@
      ====================================================================== */
   var ring = $('#ring');
   var carousel = $('#carousel');
-  var hudIndex = $('#hudIndex');
-  var hudTitle = $('#hudTitle');
-  var hudLatin = $('#hudLatin');
-  var hudTags = $('#hudTags');
-  var hudTicks = $('#hudTicks');
 
   var STEP = 360 / HERO.length;    // 相邻面板夹角
   var AUTO_SPEED = 6;              // 自动旋转速度：度 / 秒
@@ -44,19 +39,17 @@
   var activeIndex = 0;
   var tween = null;                // 吸附 / 跳转的补间
   var panelEls = [];
-  var tickEls = [];
 
-  /* --- 构建面板与速览刻度 --- */
+  /* --- 构建面板 --- */
   HERO.forEach(function (f, i) {
     var el = document.createElement('article');
-    el.className = 'panel';
+    el.className = 'panel' + (i === 0 ? ' is-active' : '');
     el.style.setProperty('--i', i);
     el.innerHTML =
       '<div class="panel__frame">' +
         '<img class="panel__img" draggable="false" src="assets/hero/' + f.name + '.webp" ' +
-             'alt="' + f.title + '：动画截图，色调' + f.tags.join('、') + '">' +
+             'alt="' + (f.title ? f.title + '：' : '') + '动画截图，色调' + f.tags.join('、') + '">' +
         '<span class="panel__veil"></span>' +
-        '<span class="panel__tag">FRAME ' + pad(f.id) + ' · ' + f.date + '</span>' +
       '</div>';
     el.addEventListener('click', function () {
       if (moved) return;                       // 拖拽后的误触不算点击
@@ -65,14 +58,6 @@
     });
     ring.appendChild(el);
     panelEls.push(el);
-
-    var tick = document.createElement('button');
-    tick.type = 'button';
-    tick.setAttribute('role', 'tab');
-    tick.setAttribute('aria-label', '第 ' + (i + 1) + ' 帧：' + f.title);
-    tick.addEventListener('click', function () { goToIndex(i); });
-    hudTicks.appendChild(tick);
-    tickEls.push(tick);
   });
 
   /* --- 响应式尺寸 ---
@@ -86,9 +71,9 @@
     var vh = window.innerHeight;
     var cot = 1 / Math.tan(Math.PI / HERO.length);   // 半径系数：R = (w/2)·cot
 
-    var shownW = vw * (vw < 700 ? 0.84 : 0.70);
-    shownW = Math.min(shownW, vh * 0.92);
-    shownW = Math.max(shownW, 220);
+    var shownW = vw * (vw < 700 ? 0.92 : 0.80);
+    shownW = Math.min(shownW, vh * 1.08);
+    shownW = Math.max(shownW, 240);
 
     var w = shownW * PERSPECTIVE / (PERSPECTIVE + (cot / 2) * shownW);
     var h = w / DATA.ratio;
@@ -127,7 +112,7 @@
     requestAnimationFrame(loop);
   }
 
-  /* 松手 / 暂停自动时吸附到最近的一帧 */
+  /* 松手 / 暂停自动时吸附到最近的一张 */
   function snap() {
     var target = Math.round(angle / STEP) * STEP;
     if (Math.abs(target - angle) > 0.1) { angle += (target - angle) * 0.14; }
@@ -139,44 +124,26 @@
     tween = { from: angle, to: target, start: performance.now(), dur: 620 };
   }
 
-  /* 按方向翻一帧（← → 与按钮共用） */
+  /* 按方向翻一张（← → 键） */
   function stepBy(dir) {
     animateTo(angle - dir * STEP);
   }
 
-  /* 直接跳到某一帧（刻度点击 / 点击非当前面板） */
+  /* 直接跳到某一张（点击非当前面板） */
   function goToIndex(i) {
     var base = -i * STEP;
     var k = Math.round((angle - base) / 360);
     animateTo(base + k * 360);
   }
 
-  /* --- 渲染：只在当前帧变化时才写 DOM --- */
+  /* --- 渲染：只在当前画面变化时才写 DOM --- */
   function render() {
     ring.style.transform = 'rotateY(' + angle.toFixed(3) + 'deg)';
     var idx = mod(Math.round(-angle / STEP), HERO.length);
     if (idx !== activeIndex) {
       activeIndex = idx;
-      paintHUD();
+      panelEls.forEach(function (el, i) { el.classList.toggle('is-active', i === activeIndex); });
     }
-  }
-
-  function paintHUD() {
-    var f = HERO[activeIndex];
-    panelEls.forEach(function (el, i) { el.classList.toggle('is-active', i === activeIndex); });
-    tickEls.forEach(function (el, i) {
-      el.setAttribute('aria-current', i === activeIndex ? 'true' : 'false');
-    });
-    hudIndex.textContent = 'FRAME ' + pad(f.id);
-    hudTitle.textContent = f.title;
-    hudLatin.textContent = f.en;
-    hudTags.innerHTML = f.tags.map(function (t) { return '<span>' + t + '</span>'; }).join('');
-  }
-
-  function setAutoUI() {
-    var btn = $('#btnAuto');
-    btn.setAttribute('aria-pressed', auto ? 'true' : 'false');
-    btn.setAttribute('aria-label', auto ? '暂停自动旋转' : '开始自动旋转');
   }
 
   /* --- 拖拽旋转（指针事件，兼容鼠标与触摸） --- */
@@ -221,26 +188,21 @@
     e.preventDefault();
     angle += e.deltaX * 0.28;
     auto = false;
-    setAutoUI();
   }, { passive: false });
 
-  /* --- 键盘：← → 翻帧，空格切换自动旋转 --- */
+  /* --- 键盘：← → 翻一张，空格切自动旋转 --- */
   document.addEventListener('keydown', function (e) {
     if (lb.classList.contains('is-open')) return;
     var tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea') return;
 
-    if (e.key === 'ArrowLeft') { auto = false; setAutoUI(); stepBy(-1); }
-    else if (e.key === 'ArrowRight') { auto = false; setAutoUI(); stepBy(1); }
+    if (e.key === 'ArrowLeft') { auto = false; stepBy(-1); }
+    else if (e.key === 'ArrowRight') { auto = false; stepBy(1); }
     else if (e.key === ' ' && document.activeElement === document.body) {
       e.preventDefault();
-      auto = !auto; setAutoUI();
+      auto = !auto;
     }
   });
-
-  $('#btnPrev').addEventListener('click', function () { auto = false; setAutoUI(); stepBy(-1); });
-  $('#btnNext').addEventListener('click', function () { auto = false; setAutoUI(); stepBy(1); });
-  $('#btnAuto').addEventListener('click', function () { auto = !auto; setAutoUI(); });
 
   /* ======================================================================
      二、目录网格
@@ -249,8 +211,6 @@
   var filters = $('#filters');
   var empty = $('#empty');
   var currentTag = '全部';
-
-  function frameLabel(f) { return f.title || ('FRAME ' + pad(f.id)); }
 
   function renderGrid() {
     var frag = document.createDocumentFragment();
@@ -266,37 +226,28 @@
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'card__frame';
-      btn.setAttribute('aria-label', '放大查看 ' + frameLabel(f));
+      btn.setAttribute('aria-label', '放大查看' + (f.title ? '：' + f.title : '这张截图'));
 
       var img = document.createElement('img');
       img.className = 'card__img';
       img.loading = 'lazy';
       img.decoding = 'async';
       img.src = 'assets/grid/' + f.name + '.webp';
-      img.alt = f.title
-        ? f.title + '：动画截图，色调' + f.tags.join('、')
-        : '动画截图第 ' + f.id + ' 帧，色调' + f.tags.join('、');
-
-      var hover = document.createElement('span');
-      hover.className = 'card__hover';
-      hover.textContent = frameLabel(f);
+      img.alt = (f.title ? f.title + '：' : '') + '动画截图，色调' + f.tags.join('、');
 
       btn.appendChild(img);
-      btn.appendChild(hover);
+
+      // 有题名的才在悬停时浮现题名条，没有的就保持干净
+      if (f.title) {
+        var hover = document.createElement('span');
+        hover.className = 'card__hover';
+        hover.textContent = f.title;
+        btn.appendChild(hover);
+      }
+
       btn.addEventListener('click', function () { openLightbox(f); });
 
-      var cap = document.createElement('figcaption');
-      cap.className = 'card__meta';
-      var name = document.createElement('span');
-      name.className = 'card__name';
-      name.textContent = frameLabel(f);
-      var tags = document.createElement('span');
-      tags.textContent = f.tags.join(' · ');
-      cap.appendChild(name);
-      cap.appendChild(tags);
-
       card.appendChild(btn);
-      card.appendChild(cap);
       frag.appendChild(card);
     });
 
@@ -339,7 +290,7 @@
     empty.hidden = shown > 0;
   }
 
-  /* 供灯箱使用：当前筛选下真正可见的帧 */
+  /* 供灯箱使用：当前筛选下真正可见的画面 */
   function visibleFrames() {
     return FRAMES.filter(function (f) {
       return currentTag === '全部' || f.tags.indexOf(currentTag) >= 0;
@@ -362,10 +313,10 @@
     var f = lbList[lbPos];
     if (!f) return;
     lbImg.src = 'assets/view/' + f.name + '.webp';
-    lbImg.alt = (f.title ? f.title + '：' : '') + '动画截图第 ' + f.id + ' 帧';
-    lbTitle.textContent = frameLabel(f);
-    lbLatin.textContent = f.en || '';
-    lbMeta.textContent = 'FRAME ' + pad(f.id) + ' / ' + pad(lbList.length) + ' · ' + f.date + ' · ' + f.tags.join(' · ');
+    lbImg.alt = (f.title ? f.title + '：' : '') + '动画截图';
+    lbTitle.textContent = f.title || '—';
+    lbLatin.textContent = f.title ? (f.en || '') : '';
+    lbMeta.textContent = pad(f.id) + ' / ' + pad(lbList.length) + ' · ' + f.date + ' · ' + f.tags.join(' · ');
   }
 
   function openLightbox(frame) {
@@ -451,26 +402,19 @@
     renderGrid();
     buildFilters();
     layout();
-    paintHUD();
-    setAutoUI();
     observeReveals();
 
-    $('#totalCount').textContent = FRAMES.length;
     $('#statCount').textContent = pad(FRAMES.length);
     $('#statHero').textContent = pad(HERO.length);
     $('#year').textContent = new Date().getFullYear();
 
-    if (REDUCE) { auto = false; setAutoUI(); }
-    else { requestAnimationFrame(loop); }
+    if (!REDUCE) { requestAnimationFrame(loop); }
 
     var resizeTimer = null;
     window.addEventListener('resize', function () {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(layout, 140);
     });
-
-    // 页面载入后让第一帧先亮起来
-    panelEls[0].classList.add('is-active');
   }
 
   init();

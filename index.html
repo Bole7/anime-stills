@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>截帧 · 近期日漫截图分享</title>
-<meta name="description" content="截帧 —— 一个近期日本动画截图分享站。环幕旋转查看精选画面，可按色调筛选全部 53 帧，点击放大阅读字幕细节。">
+<meta name="description" content="截帧 —— 一个近期日本动画截图分享站。环幕旋转查看精选画面，可按色调筛选，点击放大阅读字幕细节。">
 <meta name="author" content="王博乐">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,55 +54,12 @@
         <div class="carousel__ring" id="ring"></div>
       </div>
 
-      <!-- 控制台 -->
-      <div class="stage__hud intro intro-4">
-        <div class="hud__now">
-          <span class="hud__index" id="hudIndex">—</span>
-          <span class="hud__title" id="hudTitle">载入中</span>
-          <span class="hud__latin" id="hudLatin"></span>
-          <span class="hud__tags" id="hudTags"></span>
-        </div>
-
-        <div class="hud__controls">
-          <span class="hud__hint">拖拽 / ← →</span>
-
-          <div class="hud__ticks" id="hudTicks" role="tablist" aria-label="帧速览"></div>
-
-          <button class="ctrl" id="btnPrev" type="button" aria-label="上一帧">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M15 5l-7 7 7 7"/>
-            </svg>
-          </button>
-          <button class="ctrl" id="btnNext" type="button" aria-label="下一帧">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M9 5l7 7-7 7"/>
-            </svg>
-          </button>
-          <button class="ctrl" id="btnAuto" type="button" aria-pressed="true" aria-label="暂停自动旋转">
-            <svg class="icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
-              <path d="M9 5v14M15 5v14"/>
-            </svg>
-            <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M7 4.5l12 7.5-12 7.5z"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
     </div>
   </section>
 
   <!-- =========================== 二、目录 =========================== -->
-  <section class="index" id="index" aria-labelledby="indexTitle">
+  <section class="index" id="index" aria-label="截图目录">
     <div class="shell">
-      <div class="section-head reveal">
-        <div>
-          <p class="eyebrow">Index · 目录</p>
-          <h2 id="indexTitle">全部 <span class="num" id="totalCount">53</span> 帧</h2>
-        </div>
-        <p>每帧都经过主色分析自动归档，可按色调快速翻找。画面保留原尺寸字幕细节，仅移除来源水印。</p>
-      </div>
-
       <div class="filters" id="filters" role="group" aria-label="按色调筛选"></div>
       <div class="grid" id="grid"></div>
       <p class="empty" id="empty" hidden>这个色调下暂时没有画面。</p>
@@ -117,16 +74,16 @@
       <div class="about__body">
         <p class="about__lede reveal" id="aboutTitle">
           把喜欢的画面<em>停下来</em>。<br>
-          一帧一帧地看，比连着看完一遍，更容易记很久。
+          一张一张地看，比连着看完一遍，更容易记很久。
         </p>
 
         <div class="about__cols reveal">
-          <p>这里收的是近期在追的动画里按下的截图，以《电锯人》为主，混着几部同期作品。挑片子的标准只有一条：这一帧单独拿出来，还立得住。</p>
-          <p>页面主体是一圈会缓慢自转的环幕 —— 可以拖，可以滚，也可以用方向键一帧一帧翻。看到想细看的，点开就是原图。</p>
+          <p>这里收的是近期在追的动画里按下的截图，以《电锯人》为主，混着几部同期作品。挑片子的标准只有一条：这一张单独拿出来，还立得住。</p>
+          <p>页面主体是一圈会缓慢自转的环幕 —— 可以拖，可以滚，也可以用方向键一张一张翻。看到想细看的，点开就是原图。</p>
 
           <dl class="stats">
             <div>
-              <dt>Frames</dt>
+              <dt>Stills</dt>
               <dd id="statCount">53</dd>
             </div>
             <div>

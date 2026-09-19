@@ -140,32 +140,6 @@ hr {
   background: var(--accent);
 }
 
-.num {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--accent);
-  letter-spacing: 0.06em;
-}
-
-.section-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  padding-bottom: var(--sp-4);
-  border-bottom: 1px solid var(--line);
-}
-.section-head h2 {
-  font-size: var(--fs-2xl);
-  letter-spacing: -0.015em;
-}
-.section-head p {
-  max-width: 40ch;
-  color: var(--ink-2);
-  font-size: var(--fs-base);
-}
-
 /* --- 滚动入场：只动 opacity 与 transform ------------------------------ */
 .reveal {
   opacity: 0;
