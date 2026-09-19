@@ -900,3 +900,342 @@ body.is-picking .toast { bottom: calc(var(--sp-4) + var(--selbar-h, 56px) + 12px
   .selbar__btn { min-height: 40px; padding: 0 14px; }
   .card__pick { width: 32px; height: 32px; }
 }
+
+/* --------------------------------------------------------------------------
+   十、环幕管理
+   环幕上放哪几张由用户自己定：环幕下面一个小药丸开门，面板里点一下加上、
+   再点一下移下。样式沿用纸感画廊那套 —— 纸底、墨字、朱红只做重点。
+   -------------------------------------------------------------------------- */
+
+/* 入口：不抢画面，靠右放一颗小药丸，数字沿用等宽字 */
+.stage__bar {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--sp-2);
+}
+
+.ringbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: rgba(250, 249, 245, 0.7);
+  backdrop-filter: blur(8px);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.ringbar:hover {
+  color: var(--ink);
+  border-color: var(--ink-2);
+  background: rgba(250, 249, 245, 0.95);
+}
+.ringbar svg { display: block; }
+.ringbar b {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+/* 素材确实取不出来时的占位：破图图标不体面，换成一句实话 */
+img.is-dead { visibility: hidden; }
+.dead {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  background:
+    repeating-linear-gradient(45deg, transparent 0 7px, var(--accent-soft) 7px 14px),
+    var(--paper-soft);
+  pointer-events: none;
+}
+
+/* 面板本身 */
+.ringbox {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: grid;
+  /* 面板里是一排不换行的缩略图，列宽必须显式收住，
+     否则 grid 会按 max-content 把卡片撑到几千像素宽 */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  padding: var(--sp-4);
+  background: rgba(22, 21, 15, 0.32);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    visibility var(--dur-base) var(--ease-out);
+}
+.ringbox[hidden] { display: none; }
+.ringbox.is-open { opacity: 1; visibility: visible; }
+
+.ringbox__card {
+  width: min(880px, 100%);
+  min-width: 0;
+  max-height: min(86svh, 780px);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper-soft);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-3);
+  transform: translateY(12px);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.ringbox.is-open .ringbox__card { transform: none; }
+
+.ringbox__head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--line-soft);
+}
+.ringbox__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.ringbox__sub {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.ringbox__sub b {
+  font-weight: 500;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.ringbox__close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-2);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.ringbox__close:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-soft);
+}
+
+.ringbox__body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+}
+
+.ringbox__sec + .ringbox__sec { margin-top: var(--sp-4); }
+
+.ringbox__label {
+  margin: 0 0 var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.ringbox__label span {
+  margin-left: var(--sp-2);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--ink-3);
+}
+
+.ringbox__hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+}
+
+/* 一横排缩略图，多了横着滚 */
+.ringbox__row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+
+.rt { position: relative; flex: none; }
+
+.rt__btn {
+  position: relative;
+  display: block;
+  width: 92px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  overflow: hidden;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.rt__btn img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    filter var(--dur-fast) var(--ease-out);
+}
+.rt__btn:hover { border-color: var(--ink-2); box-shadow: var(--shadow-1); }
+
+/* 还没上环幕的压暗一些，一眼能分出两组 */
+.rt--off .rt__btn img { opacity: 0.5; filter: saturate(0.55); }
+.rt--off .rt__btn:hover img { opacity: 1; filter: none; }
+.rt--off .rt__btn:hover { border-color: var(--accent); }
+
+/* 右下角的 ＋ / × ：触屏上没有 hover，所以常驻 */
+.rt__mark {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: rgba(22, 21, 15, 0.72);
+  color: #FAF9F5;
+  font-size: 11px;
+  line-height: 1;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.rt--on .rt__btn:hover .rt__mark { background: var(--accent); }
+.rt--off .rt__btn:hover .rt__mark { background: var(--accent); }
+
+/* 环幕上的顺序号：自转的圈上排第几 */
+.rt__no,
+.rt__tag {
+  position: absolute;
+  z-index: 2;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+.rt__no {
+  left: 3px;
+  top: 3px;
+  color: #FAF9F5;
+  background: rgba(22, 21, 15, 0.62);
+  font-variant-numeric: tabular-nums;
+}
+.rt__tag {
+  left: 3px;
+  bottom: 3px;
+  color: var(--accent);
+  background: rgba(244, 242, 236, 0.9);
+}
+
+/* 素材缺失的那一格 */
+.rt--dead .rt__btn { border-color: var(--accent); }
+.rt__ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  background:
+    repeating-linear-gradient(45deg, transparent 0 7px, var(--accent-soft) 7px 14px),
+    var(--paper-soft);
+}
+
+.ringbox__foot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--line-soft);
+}
+
+.ringbox__btn {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.ringbox__btn:hover {
+  color: var(--ink);
+  border-color: var(--ink-2);
+  background: var(--panel);
+}
+.ringbox__btn--solid {
+  margin-left: auto;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-soft);
+}
+.ringbox__btn--solid:hover {
+  background: #000000;
+  border-color: #000000;
+  color: var(--paper-soft);
+}
+
+@media (max-width: 640px) {
+  .stage__bar { justify-content: center; }
+  .ringbox { padding: 0; place-items: end stretch; }
+  .ringbox__card {
+    width: 100%;
+    max-height: 88svh;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    transform: translateY(24px);
+  }
+  .ringbox__head,
+  .ringbox__body,
+  .ringbox__foot { padding-inline: var(--sp-3); }
+  .ringbox__btn { flex: 1 1 auto; min-height: 40px; }
+  .ringbox__btn--solid { margin-left: 0; flex: 1 1 100%; }
+}

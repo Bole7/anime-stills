@@ -2,6 +2,18 @@
 window.ANIME_FRAMES = {
  "ratio": 1.8155,
  "count": 53,
+ /* 有 1600px 大图的那些：环幕优先取 hero，没有的退回 view（1200px），
+    免得用户把任意一张放上环幕时去请求并不存在的 assets/hero/xx.webp */
+ "heroAssets": [
+  "frame-01",
+  "frame-06",
+  "frame-16",
+  "frame-25",
+  "frame-29",
+  "frame-37",
+  "frame-49",
+  "frame-52"
+ ],
  "frames": [
   {
    "id": 1,

@@ -4,10 +4,10 @@
    二、环幕轮播（3D 圆柱：自转 / 拖拽惯性 / 吸附 / 键盘 / 触点，画面可自选）
    三、目录网格（分类筛选 + 自传图片的插入与移除）
    四、批量选择（点选 / 框选 / 拖拽整批转移 / 批量移除）
-   五、归类浮层（触屏与键盘的替代路径）
-   六、灯箱（放大查看 + 键盘导航 + 焦点回收）
-   七、上传（本机图片 → canvas 缩放编码 → 色调统计 → IndexedDB 落盘）
-   八、入场编排与导航状态
+   五、归类浮层与灯箱（触屏、键盘的替代路径 + 放大查看）
+   六、上传（本机图片 → canvas 缩放编码 → 色调统计 → IndexedDB 落盘）
+      · 六·补 环幕管理（自主增删环幕上的画面）
+   七、入场编排与导航状态
    说明：全部逻辑用普通脚本封装在 IIFE 内，双击本地文件即可运行，
         不依赖任何构建工具与模块加载（避免 file:// 下的跨域限制）。
    ========================================================================== */
@@ -32,10 +32,53 @@
   var ALL = 'all';                 // 「全部」不是分类，是一个聚合视图
   var UNSORTED = '__unsorted';     // 兜底分类：内置素材与新建分类前的自传图片都在这
 
+  /* --- 素材寻址 ---------------------------------------------------------
+     内置截图有三档：hero(1600) / view(1200) / grid(800)，但只有一部分图
+     备了大图。所以 hero 档必须先查名单，没有就退回 view —— 否则用户把
+     任意一张放上环幕，浏览器就会去请求不存在的 assets/hero/xx.webp。 */
+  var HERO_ASSETS = {};
+  (DATA.heroAssets || []).forEach(function (n) { HERO_ASSETS[n] = true; });
+
   function imgURL(f, size) {
-    return f.custom ? f.src : 'assets/' + size + '/' + f.name + '.webp';
+    if (f.custom) { return f.src; }
+    var tier = size;
+    if (tier === 'hero' && !HERO_ASSETS[f.name]) { tier = 'view'; }
+    return 'assets/' + tier + '/' + f.name + '.webp';
   }
   function kindOf(f) { return f.custom ? '自传图片' : '动画截图'; }
+
+  /* 真正取不到的图（自传图的数据坏了、或文件被挪走）不能只留一个破图标：
+     逐级降档，全挂就把这张记进 deadIds，管理面板里给一条去路。 */
+  var deadIds = {};
+
+  function deadLabel(el) {
+    var box = document.createElement('span');
+    box.className = 'dead';
+    box.textContent = '素材缺失';
+    el.appendChild(box);
+  }
+
+  function armImage(img, f, size) {
+    // 灯箱里是同一个 img 反复换图，所以先把上一轮的处理摘掉
+    if (img._armErr) { img.removeEventListener('error', img._armErr); }
+    var tier = size;
+    img._armErr = function () {
+      if (!f.custom && tier !== 'grid') {
+        tier = tier === 'hero' ? 'view' : 'grid';
+        img.src = 'assets/' + tier + '/' + f.name + '.webp';
+        return;
+      }
+      var fresh = !deadIds[String(f.id)];
+      deadIds[String(f.id)] = true;
+      img.classList.add('is-dead');
+      var box = img.parentNode;
+      if (box && !box.querySelector('.dead')) { deadLabel(box); }
+      // 这张确实取不出来了，先从环幕上撤掉，再等用户决定去留
+      if (fresh) { buildRing(); }
+      paintRingBar();
+    };
+    img.addEventListener('error', img._armErr);
+  }
 
   var ICON = {
     ring: '<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.2 4.4v5h-5"/>',
@@ -196,10 +239,11 @@
     var o = heroMap[String(f.id)];
     return o === undefined ? !!f.hero : !!o;
   }
-  function heroFrames() {
-    // 被隐藏的画面自动退出环幕，不用单独维护一份名单
-    return FRAMES.filter(function (f) { return inHero(f) && !isHidden(f); });
+  /* 在不在环幕上：名单之外还要过两道 —— 被隐藏的、素材缺失的都不算 */
+  function onRing(f) {
+    return inHero(f) && !isHidden(f) && !deadIds[String(f.id)];
   }
+  function heroFrames() { return FRAMES.filter(onRing); }
 
   function setHero(f, on) {
     if (!on && heroFrames().length <= HERO_MIN) {
@@ -257,8 +301,9 @@
       var img = document.createElement('img');
       img.className = 'panel__img';
       img.draggable = false;
-      img.src = imgURL(f, 'hero');
       img.alt = (f.title ? f.title + '：' : '') + kindOf(f);
+      armImage(img, f, 'hero');          // 先挂降档处理，再给 src
+      img.src = imgURL(f, 'hero');
       frame.appendChild(img);
 
       var veil = document.createElement('span');
@@ -276,6 +321,11 @@
     });
 
     layout();
+
+    // 名单变了：入口上的数字、About 里的统计都跟着变，面板开着就顺手刷一遍
+    paintRingBar();
+    paintStats();
+    if (ringbox && !ringbox.hidden) { syncRingBox(); }
   }
 
   /* --- 响应式尺寸 ---
@@ -408,6 +458,11 @@
   /* --- 键盘：← → 翻一张，空格切自动旋转，Esc 退出选择 --- */
   document.addEventListener('keydown', function (e) {
     if (lb.classList.contains('is-open')) { return; }
+    // 环幕管理面板开着的时候，方向键留给面板自己用
+    if (ringbox && !ringbox.hidden) {
+      if (e.key === 'Escape') { closeRingBox(); }
+      return;
+    }
     var tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea') { return; }
 
@@ -460,8 +515,9 @@
     img.loading = 'lazy';
     img.decoding = 'async';
     img.draggable = false;                        // 拖拽交给整张卡片
-    img.src = imgURL(f, 'grid');
     img.alt = (f.title ? f.title + '：' : '') + kindOf(f) + '，' + seriesName(seriesOf(f));
+    armImage(img, f, 'grid');
+    img.src = imgURL(f, 'grid');
     view.appendChild(img);
 
     // 有题名的才在悬停时浮现题名条，没有的就保持干净
@@ -509,7 +565,7 @@
     if (!NO_HOVER) {
       var tRing = iconBtn('放到环幕上', ICON.ring);
       function paintRingBtn() {
-        var on = inHero(f);
+        var on = onRing(f);
         tRing.classList.toggle('is-on', on);
         tRing.title = on ? '从环幕移出' : '放到环幕上';
         tRing.setAttribute('aria-label', tRing.title);
@@ -517,7 +573,11 @@
       paintRingBtn();
       tRing.addEventListener('click', function (e) {
         e.stopPropagation();
-        var on = !inHero(f);
+        if (deadIds[String(f.id)]) {          // 素材读不出来，放上去也是空白
+          toast('这张素材读不出来，先换一张');
+          return;
+        }
+        var on = !onRing(f);
         if (setHero(f, on)) {
           paintRingBtn();
           toast(on ? '已放到环幕上' : '已从环幕移出');
@@ -690,7 +750,10 @@
     addBtn.innerHTML =
       '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
       'stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
-    addBtn.addEventListener('click', function () { fileInput.click(); });
+    addBtn.addEventListener('click', function () {
+      clearPendingRing();                   // 普通上传不往环幕上塞
+      fileInput.click();
+    });
     filters.appendChild(addBtn);
 
     // 新建分类：这个必须带字，否则没人猜得到它是干什么的
@@ -1056,6 +1119,7 @@
       } else {
         hiddenSet[String(f.id)] = true;
         delete picked[String(f.id)];
+        delete deadIds[String(f.id)];
         hid++;
       }
     });
@@ -1160,7 +1224,7 @@
     var acts = document.createElement('div');
     acts.className = 'mover__acts';
 
-    var on = inHero(f);
+    var on = onRing(f);
     var aRing = document.createElement('button');
     aRing.type = 'button';
     aRing.className = 'mover__act';
@@ -1267,6 +1331,7 @@
   function paintLightbox() {
     var f = lbList[lbPos];
     if (!f) { return; }
+    armImage(lbImg, f, 'view');
     lbImg.src = imgURL(f, 'view');
     lbImg.alt = (f.title ? f.title + '：' : '') + kindOf(f);
     lbTitle.textContent = f.title || '—';
@@ -1553,8 +1618,8 @@
       rec.id = 'c' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
       rec.date = stamp();
       rec.ts = Date.now();
-      mountCustom(rec);
-      return saveRecord(rec).then(function () { return true; });
+      var f = mountCustom(rec);
+      return saveRecord(rec).then(function () { return f; });
     });
   }
 
@@ -1573,11 +1638,12 @@
     if (addBtn) { addBtn.classList.add('is-busy'); }
 
     var ok = 0, bad = 0;
+    var made = [];                       // 这一轮新进来的画面
     var chain = Promise.resolve();
     files.forEach(function (file) {
       chain = chain.then(function () {
         return addOne(file).then(
-          function () { ok++; },
+          function (f) { ok++; made.push(f); },
           function () { bad++; }
         );
       });
@@ -1585,12 +1651,32 @@
 
     chain.then(function () {
       if (addBtn) { addBtn.classList.remove('is-busy'); }
+
+      /* 从环幕面板点的上传：传完直接放上去，省得再一张张挑 */
+      var onRing = 0;
+      if (pendingRing) {
+        clearPendingRing();
+        made.forEach(function (f) {
+          if (!f || inHero(f)) { return; }
+          if (heroFrames().length >= MAX_HERO) { return; }
+          heroMap[String(f.id)] = true;
+          patchRecord(f.id, { hero: true });
+          onRing++;
+        });
+        if (onRing) {
+          writeLS(LS_HERO, heroMap);
+          buildRing();
+        }
+      }
+
       refreshFilters();
 
       var msg = ok ? '已加入 ' + ok + ' 张到「' + seriesName(uploadTarget()) + '」' : '没能读进来';
       if (bad) { msg += '，' + bad + ' 张跳过'; }
       if (skipped) { msg += '，另有 ' + skipped + ' 张超出上限'; }
+      if (onRing) { msg += '，已放到环幕上'; }
       if (dbFailed) { msg += '（本次有效）'; }
+      if (!ringbox.hidden) { syncRingBox(); }
       toast(msg);
     });
   }
@@ -1609,6 +1695,7 @@
     delete assignMap[String(f.id)];
     delete heroMap[String(f.id)];
     delete picked[String(f.id)];
+    delete deadIds[String(f.id)];
     writeLS(LS_ASSIGN, assignMap);
     writeLS(LS_HERO, heroMap);
     dropRecord(f.id);
@@ -1665,7 +1752,210 @@
     e.preventDefault();
     dragDepth = 0;
     dropzone.classList.remove('is-on');
+    clearPendingRing();                    // 拖进来的按普通上传处理
     handleFiles(e.dataTransfer.files);
+  });
+
+  /* ======================================================================
+     六·补 环幕管理（自己决定环幕上放哪几张）
+     环幕上放哪几张完全交给用户：面板里点一下就加上、再点一下移下，
+     也能整批放上去或恢复默认。名单沿用 localStorage 的 hero 表，
+     自传图片再往库里补写一份，清了浏览器数据也还在。
+     ====================================================================== */
+  var MAX_HERO = 24;              // 再多下去，一圈面板会把浏览器拖慢
+  var ringBar = $('#ringBar');
+  var ringBarCount = $('#ringBarCount');
+  var ringbox = $('#ringbox');
+  var ringOnRow = $('#ringOn');
+  var ringOffRow = $('#ringOff');
+  var ringDeadRow = $('#ringDead');
+  var ringDeadSec = $('#ringDeadSec');
+  var ringBoxEmpty = $('#ringBoxEmpty');
+  var ringBoxOn = $('#ringBoxOn');
+  var pendingRing = false;        // 从面板点的"上传"，传完直接放上环幕
+  var pendingTimer = null;
+
+  function clearPendingRing() {
+    pendingRing = false;
+    clearTimeout(pendingTimer);
+  }
+
+  function paintRingBar() {
+    if (!ringBarCount) { return; }
+    var n = heroFrames().length;
+    ringBarCount.textContent = pad(n);
+    ringBar.title = '环幕上现有 ' + n + ' 张，点开可自行增删';
+  }
+
+  function deadFrames() {
+    return FRAMES.filter(function (f) { return deadIds[String(f.id)]; });
+  }
+
+  /* --- 面板里的一个小格：缩略图 + ×/＋ --- */
+  function ringThumb(f, mode) {
+    var cell = document.createElement('div');
+    cell.className = 'rt rt--' + mode;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'rt__btn';
+    var label = f.title || seriesName(seriesOf(f));
+    btn.title = (mode === 'on' ? '从环幕移下：' : '放到环幕上：') + label;
+    btn.setAttribute('aria-label', btn.title);
+
+    var img = document.createElement('img');
+    img.alt = '';
+    img.draggable = false;
+    img.loading = 'lazy';
+    armImage(img, f, 'grid');
+    img.src = imgURL(f, 'grid');
+    btn.appendChild(img);
+
+    var mark = document.createElement('span');
+    mark.className = 'rt__mark';
+    mark.textContent = mode === 'on' ? '×' : '＋';
+    btn.appendChild(mark);
+
+    if (mode === 'on') {
+      var no = document.createElement('span');
+      no.className = 'rt__no';
+      no.textContent = pad(heroFrames().indexOf(f) + 1);
+      cell.appendChild(no);
+    }
+    if (f.custom) {
+      var tag = document.createElement('span');
+      tag.className = 'rt__tag';
+      tag.textContent = '自传';
+      cell.appendChild(tag);
+    }
+
+    btn.addEventListener('click', function () {
+      if (mode === 'on') { takeOffRing(f); } else { putOnRing(f); }
+    });
+
+    cell.appendChild(btn);
+    return cell;
+  }
+
+  /* --- 取不出来的那几张：给一个明确的去路，而不是留着破图 --- */
+  function deadThumb(f) {
+    var cell = document.createElement('div');
+    cell.className = 'rt rt--dead';
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'rt__btn';
+    btn.title = '清掉这张读不出来的画面';
+    btn.setAttribute('aria-label', btn.title);
+
+    var box = document.createElement('span');
+    box.className = 'rt__ph';
+    box.textContent = '缺失';
+    btn.appendChild(box);
+
+    btn.addEventListener('click', function () { removeFrames([f]); });
+    cell.appendChild(btn);
+    return cell;
+  }
+
+  function putOnRing(f) {
+    if (inHero(f)) { return; }
+    if (heroFrames().length >= MAX_HERO) {
+      toast('环幕最多 ' + MAX_HERO + ' 张，先移下几张');
+      return;
+    }
+    if (!setHero(f, true)) { return; }
+    toast('已放到环幕上');
+  }
+
+  function takeOffRing(f) {
+    if (!inHero(f)) { return; }
+    if (!setHero(f, false)) { return; }        // 少于 3 张时 setHero 会拦下
+    toast('已从环幕移下');
+  }
+
+  function syncRingBox() {
+    var on = heroFrames();
+
+    ringBoxOn.textContent = pad(on.length);
+    ringOnRow.innerHTML = '';
+    on.forEach(function (f) { ringOnRow.appendChild(ringThumb(f, 'on')); });
+
+    var off = FRAMES.filter(function (f) { return !onRing(f); });   // 缺失的走下面那段单独列
+    ringOffRow.innerHTML = '';
+    if (off.length) {
+      off.forEach(function (f) { ringOffRow.appendChild(ringThumb(f, 'off')); });
+    } else {
+      var done = document.createElement('p');
+      done.className = 'ringbox__hint';
+      done.textContent = '目录里的画面都在环幕上了。';
+      ringOffRow.appendChild(done);
+    }
+
+    var dead = deadFrames();
+    ringDeadSec.hidden = !dead.length;
+    ringDeadRow.innerHTML = '';
+    dead.forEach(function (f) { ringDeadRow.appendChild(deadThumb(f)); });
+
+    if (ringBoxEmpty) {
+      ringBoxEmpty.hidden = (on.length + off.length + dead.length) > 0;
+    }
+  }
+
+  function openRingBox() {
+    syncRingBox();
+    ringbox.hidden = false;
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(function () { ringbox.classList.add('is-open'); });
+    $('#ringBoxClose').focus();
+  }
+
+  function closeRingBox() {
+    if (ringbox.hidden) { return; }
+    ringbox.classList.remove('is-open');
+    document.body.style.overflow = '';
+    setTimeout(function () {
+      if (!ringbox.classList.contains('is-open')) { ringbox.hidden = true; }
+    }, 260);
+    if (ringBar) { ringBar.focus(); }
+  }
+
+  ringBar.addEventListener('click', openRingBox);
+  $('#ringBoxClose').addEventListener('click', closeRingBox);
+  $('#ringDone').addEventListener('click', closeRingBox);
+  ringbox.addEventListener('click', function (e) {
+    if (e.target === ringbox) { closeRingBox(); }
+  });
+
+  // 传完直接上环幕。标记用超时兜底：用户取消文件框也不会留下后遗症
+  $('#ringAdd').addEventListener('click', function () {
+    pendingRing = true;
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(function () { pendingRing = false; }, 60000);
+    fileInput.click();
+  });
+
+  $('#ringAll').addEventListener('click', function () {
+    var room = MAX_HERO - heroFrames().length;
+    if (room <= 0) { toast('环幕已经满 ' + MAX_HERO + ' 张了'); return; }
+
+    var off = FRAMES.filter(function (f) { return !onRing(f); });   // 缺失的走下面那段单独列
+    off.slice(0, room).forEach(function (f) {
+      heroMap[String(f.id)] = true;
+      if (f.custom) { patchRecord(f.id, { hero: true }); }
+    });
+    writeLS(LS_HERO, heroMap);
+    buildRing();
+    toast(off.length > room
+      ? '已放到环幕上 ' + room + ' 张，到上限了'
+      : '这一屏的画面都放上环幕了');
+  });
+
+  $('#ringReset').addEventListener('click', function () {
+    heroMap = {};
+    writeLS(LS_HERO, heroMap);
+    buildRing();
+    toast('环幕已恢复默认的 8 张');
   });
 
   /* ======================================================================

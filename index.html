@@ -6,6 +6,7 @@
 <title>近期日漫截图分享</title>
 <meta name="description" content="近期日本动画截图分享站。环幕旋转查看精选画面，可按色调筛选，点击放大阅读字幕细节，也可以上传自己的图片。">
 <meta name="author" content="王博乐">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23F4F2EC'/%3E%3Ccircle cx='16' cy='16' r='7.5' fill='none' stroke='%23C4432B' stroke-width='2'/%3E%3C/svg%3E">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,6 +47,19 @@
         <div class="carousel__ring" id="ring"></div>
       </div>
 
+      <!-- 环幕上放哪几张，由用户自己定 -->
+      <div class="stage__bar">
+        <button class="ringbar intro intro-3" id="ringBar" type="button"
+                aria-haspopup="dialog" aria-controls="ringbox">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+               stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.2 4.4v5h-5"/>
+          </svg>
+          <span>管理环幕</span>
+          <b id="ringBarCount">08</b>
+        </button>
+      </div>
+
     </div>
   </section>
 
@@ -73,6 +87,7 @@
           <p>这里收的是近期在追的动画里按下的截图。挑片子的标准只有一条：这一张单独拿出来，还立得住。</p>
           <p>页面主体是一圈会缓慢自转的环幕 —— 可以拖，可以滚，也可以用方向键一张一张翻。看到想细看的，点开就是原图。</p>
           <p>照片按番剧分堆。目录末尾的 <b aria-hidden="true">＋</b> 可以传自己的图、建自己的分类，也可以直接把图片拖到某个分类上。</p>
+          <p>环幕上摆哪几张也归你定：点开环幕下方那颗<b>管理环幕</b>，想上就上，想撤就撤。</p>
           <p>要一次挪一批，就切到<b>选择</b>：点选、按住 Shift 连选、在空白处拖个框圈住一片，再整批搬走或删掉。</p>
 
           <dl class="stats">
@@ -143,6 +158,50 @@
 
 <div class="dropzone" id="dropzone" aria-hidden="true">
   <span class="dropzone__box">松手添加到这里</span>
+</div>
+
+<!-- ============ 环幕管理：自主增删环幕上的画面 ============ -->
+<div class="ringbox" id="ringbox" role="dialog" aria-modal="true" aria-labelledby="ringBoxTitle" hidden>
+  <div class="ringbox__card">
+    <header class="ringbox__head">
+      <div>
+        <p class="ringbox__title" id="ringBoxTitle">环幕上的画面</p>
+        <p class="ringbox__sub">当前 <b id="ringBoxOn">08</b> 张 · 至少 3 张，最多 24 张</p>
+      </div>
+      <button class="ringbox__close" id="ringBoxClose" type="button" aria-label="关闭环幕管理">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18"/>
+        </svg>
+      </button>
+    </header>
+
+    <div class="ringbox__body">
+      <p class="ringbox__hint" id="ringBoxEmpty" hidden>目录里目前没有可以放上去的画面。</p>
+
+      <section class="ringbox__sec">
+        <p class="ringbox__label">在环幕上 <span>点一下就移下</span></p>
+        <div class="ringbox__row" id="ringOn"></div>
+      </section>
+
+      <section class="ringbox__sec">
+        <p class="ringbox__label">还没上环幕 <span>点一下就加上</span></p>
+        <div class="ringbox__row" id="ringOff"></div>
+      </section>
+
+      <section class="ringbox__sec" id="ringDeadSec" hidden>
+        <p class="ringbox__label">素材缺失 <span>这几张读不出来，建议清掉</span></p>
+        <div class="ringbox__row" id="ringDead"></div>
+      </section>
+    </div>
+
+    <footer class="ringbox__foot">
+      <button class="ringbox__btn" id="ringAdd" type="button">上传图片并上环幕</button>
+      <button class="ringbox__btn" id="ringAll" type="button">全部放上去</button>
+      <button class="ringbox__btn" id="ringReset" type="button">恢复默认</button>
+      <button class="ringbox__btn ringbox__btn--solid" id="ringDone" type="button">完成</button>
+    </footer>
+  </div>
 </div>
 
 <!-- ================= 批量选择：选中若干张之后底部的操作条 ================= -->
